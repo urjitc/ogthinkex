@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* React Flow text wrapping overrides */
+.react-flow__node {
+  word-break: break-word !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  hyphens: auto !important;
+}
+
+.react-flow__node div {
+  word-break: break-word !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  hyphens: auto !important;
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+}
