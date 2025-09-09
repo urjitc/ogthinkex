@@ -31,13 +31,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-origins = ["http://localhost:4321", "null"]
+origins = [
+    "http://localhost:4321", 
+    "https://uninveighing-eve-flinchingly.ngrok-free.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=origins,        # who’s allowed
+    allow_credentials=True,       # allow cookies/auth
+    allow_methods=["*"],          # allow GET, POST, etc.
+    allow_headers=["*"],          # allow custom headers
 )
 
 # In-memory "dummy" database with seeded mock data
@@ -50,9 +54,6 @@ def create_mock_data():
     
     # Create node IDs for the math conversation
     node_ids = {
-        # Main topic: Mathematics
-        "math_overview": create_node_id(),
-        
         # Subtopics
         "calculus_intro": create_node_id(),
         "algebra_intro": create_node_id(),
@@ -80,20 +81,12 @@ def create_mock_data():
         "user_id": "student-123",
         "topic": "Mathematics Study Session",
         "nodes": [
-            # Root topic: Mathematics Overview
-            {
-                "_id": node_ids["math_overview"],
-                "question_text": "I'm starting to study mathematics more seriously. Can you give me an overview of the main areas I should focus on?",
-                "answer_text": "Great question! Mathematics has many interconnected branches, but for a solid foundation, I'd recommend focusing on these key areas: 1) Algebra - the language of mathematics, dealing with variables, equations, and abstract structures, 2) Calculus - the study of change and motion, including derivatives and integrals, 3) Geometry - spatial relationships and properties of shapes, 4) Statistics & Probability - analyzing data and uncertainty. Each area builds on the others, so starting with algebra and then moving to calculus is a natural progression.",
-                "parent_node_ids": []
-            },
-            
             # Subtopic 1: Calculus Introduction
             {
                 "_id": node_ids["calculus_intro"],
                 "question_text": "I keep hearing about calculus being important. What exactly is calculus and why should I learn it?",
                 "answer_text": "Calculus is the mathematics of change and motion! It has two main branches: 1) Differential Calculus - studies rates of change (derivatives), like how fast a car is accelerating, 2) Integral Calculus - studies accumulation (integrals), like finding the total distance traveled. Calculus is everywhere: physics (motion, forces), economics (optimization), engineering (design), biology (population growth), and computer graphics. It's the foundation for understanding how things change over time.",
-                "parent_node_ids": [node_ids["math_overview"]]
+                "parent_node_ids": []
             },
             
             # Subtopic 2: Algebra Introduction
@@ -101,7 +94,7 @@ def create_mock_data():
                 "_id": node_ids["algebra_intro"],
                 "question_text": "I struggled with algebra in school. Can you help me understand what algebra is really about and why it matters?",
                 "answer_text": "Algebra is essentially the art of working with unknowns! Instead of just numbers, we use variables (like x, y) to represent quantities we don't know yet. The key ideas are: 1) Equations - mathematical statements that two things are equal, 2) Variables - symbols that can represent different values, 3) Operations - addition, subtraction, multiplication, division with these symbols. Algebra teaches logical thinking and problem-solving. It's the gateway to all higher mathematics and is used in everything from calculating tips to designing rockets!",
-                "parent_node_ids": [node_ids["math_overview"]]
+                "parent_node_ids": []
             },
             
             # Calculus Q&As
