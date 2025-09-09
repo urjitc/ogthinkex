@@ -1,11 +1,48 @@
+---
+import '../styles/global.css';
+
+// Props interface for TypeScript support
+interface Props {
+  title?: string;
+  description?: string;
+  canonicalURL?: URL;
+}
+
+const { 
+  title = "ThinkEx - Knowledge Platform", 
+  description = "Transform ChatGPT conversations into organized knowledge maps",
+  canonicalURL 
+} = Astro.props;
+---
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
+		
+		<!-- SEO Meta Tags -->
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		
+		<!-- Open Graph Meta Tags -->
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={canonicalURL?.href || Astro.url.href} />
+		
+		<!-- Twitter Card Meta Tags -->
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		
+		<!-- Canonical URL - only add if valid -->
+		{canonicalURL && canonicalURL.href && <link rel="canonical" href={canonicalURL.href} />}
+		
+		<!-- Preconnect to external domains for performance -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	</head>
 	<body>
 		<slot />
