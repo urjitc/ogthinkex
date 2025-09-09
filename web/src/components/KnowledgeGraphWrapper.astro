@@ -1,0 +1,64 @@
+---
+// Astro wrapper component for the KnowledgeGraph React component
+// This follows Astro best practices for integrating React components
+
+import KnowledgeGraph from './KnowledgeGraph/KnowledgeGraph';
+import LoadingState from './LoadingState.astro';
+
+// Props interface for TypeScript support
+interface Props {
+  graphId: string;
+  title?: string;
+  description?: string;
+}
+
+const { graphId, title = "Knowledge Base", description = "Explore and organize your knowledge with interactive Q&A cards" } = Astro.props;
+---
+
+<div class="knowledge-graph-container">
+  <!-- Loading state that shows before React component hydrates -->
+  <div id="loading-state">
+    <LoadingState message="Loading knowledge platform..." />
+  </div>
+  
+  <!-- 
+    React component with client:load directive for immediate hydration
+    This ensures the component is interactive as soon as the page loads
+  -->
+  <div id="knowledge-graph-container" style="display: none;">
+    <KnowledgeGraph graphId={graphId} client:load />
+  </div>
+</div>
+
+<script>
+  // Progressive enhancement: Hide loading state and show React component
+  // This ensures a smooth transition from loading to interactive state
+  document.addEventListener('DOMContentLoaded', () => {
+    const loadingState = document.getElementById('loading-state');
+    const knowledgeGraphContainer = document.getElementById('knowledge-graph-container');
+    
+    if (loadingState && knowledgeGraphContainer) {
+      // Small delay to ensure React component has started hydrating
+      setTimeout(() => {
+        loadingState.style.display = 'none';
+        knowledgeGraphContainer.style.display = 'block';
+      }, 100);
+    }
+  });
+</script>
+
+<style>
+  .knowledge-graph-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  }
+  
+  /* Smooth transition for loading state */
+  #loading-state {
+    transition: opacity 0.3s ease-out;
+  }
+  
+  #knowledge-graph-container {
+    transition: opacity 0.3s ease-in;
+  }
+</style>

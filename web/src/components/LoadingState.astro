@@ -1,0 +1,89 @@
+---
+// Loading state component for better UX during React component hydration
+interface Props {
+  message?: string;
+}
+
+const { message = "Loading knowledge platform..." } = Astro.props;
+---
+
+<div class="loading-container">
+  <div class="loading-content">
+    <!-- Loading spinner -->
+    <div class="loading-spinner">
+      <div class="spinner-ring"></div>
+    </div>
+    
+    <!-- Loading message -->
+    <p class="loading-message">{message}</p>
+    
+    <!-- Loading progress indicator -->
+    <div class="loading-progress">
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .loading-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  }
+  
+  .loading-content {
+    text-align: center;
+    max-width: 400px;
+    padding: 2rem;
+  }
+  
+  .loading-spinner {
+    margin-bottom: 1.5rem;
+  }
+  
+  .spinner-ring {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #e5e7eb;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+  }
+  
+  .loading-message {
+    font-size: 1.125rem;
+    color: #374151;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+  
+  .loading-progress {
+    width: 200px;
+    height: 4px;
+    background-color: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 auto;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background-color: #3b82f6;
+    border-radius: 2px;
+    animation: progress 2s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes progress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+  }
+</style>
