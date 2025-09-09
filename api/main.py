@@ -7,9 +7,9 @@ from typing import List, Optional
 
 # --- 1. Pydantic Models (No changes needed here) ---
 class QANodeInput(BaseModel):
-    question_text: str
-    answer_text: str
-    parent_node_ids: Optional[List[str]] = []
+    question_text: str = Field(..., description="The question being asked in the Q&A pair.")
+    answer_text: str = Field(..., description="The answer to the question.")
+    parent_node_ids: Optional[List[str]] = Field([], description="A list of parent node IDs to establish a hierarchical relationship.")
 
 class QANode(QANodeInput):
     # This model expects the data to have a key "_id"
@@ -25,7 +25,11 @@ class KnowledgeGraph(BaseModel):
     nodes: List[QANode]
 
 # --- 2. Corrected Backend Logic ---
-app = FastAPI()
+app = FastAPI(
+    title="ThinkEx Knowledge Graph API",
+    description="API for creating and managing hierarchical knowledge graphs of Q&A pairs. Used by a custom GPT Action to add new information.",
+    version="1.0.0",
+)
 
 origins = ["http://localhost:4321", "null"]
 app.add_middleware(
@@ -38,7 +42,7 @@ app.add_middleware(
 
 # In-memory "dummy" database with seeded mock data
 def create_mock_data():
-    """Create mock conversation data between a student and AI about Mathematics"""
+    """Note to self: make really good comments here in the models. 300 char or less. Create mock conversation data between a student and AI about Mathematics"""
     
     # Generate unique IDs for nodes
     def create_node_id():
@@ -197,6 +201,7 @@ def create_mock_data():
 # Initialize database with mock data
 DB = create_mock_data()
 
+@app.get("/graphs/{graph_id}/", response_model=KnowledgeGraph)
 @app.get("/graphs/{graph_id}", response_model=KnowledgeGraph)
 def get_graph(graph_id: str):
     if graph_id not in DB["graphs"]:
@@ -204,8 +209,17 @@ def get_graph(graph_id: str):
     # This data structure now matches the response_model
     return DB["graphs"][graph_id]
 
-@app.post("/graphs/{graph_id}/nodes", status_code=201)
+@app.post("/graphs/{graph_id}/nodes/", status_code=201, summary="Add a new Q&A node to a knowledge graph", operation_id="add_new_qa_node_to_graph")
+@app.post("/graphs/{graph_id}/nodes", status_code=201, summary="Add a new Q&A node to a knowledge graph", operation_id="add_new_qa_node_to_graph")
 def add_qa_node(graph_id: str, node_input: QANodeInput):
+    """
+    Adds a new question-answer (QA) node to a specified knowledge graph.
+
+    This action is used to expand the knowledge base with new information.
+    You need to provide the `graph_id` of the knowledge graph you want to modify.
+    The new node will contain a `question_text`, an `answer_text`, and can optionally
+    be linked to parent nodes via `parent_node_ids` to create a hierarchy.
+    """
     if graph_id not in DB["graphs"]:
         # Use "_id" when creating the graph
         DB["graphs"][graph_id] = {
