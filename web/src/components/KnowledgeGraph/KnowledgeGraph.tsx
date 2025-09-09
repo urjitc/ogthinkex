@@ -146,7 +146,11 @@ const KnowledgeGraph: React.FC<{ graphId: string }> = ({ graphId }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:8000/graphs/${graphId}`);
+        const response = await fetch(`https://uninveighing-eve-flinchingly.ngrok-free.app/graphs/${graphId}`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",   // 👈 this skips the warning page
+          },
+        });
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data: APIGraph = await response.json();
         setItems(data.nodes || []);
