@@ -39,39 +39,27 @@ const KnowledgeGraph: React.FC<{ graphId: string }> = ({ graphId }) => {
       groups[parentId].push(node);
     });
     
-    // Helper function to get subtopic name from question content
-    const getSubtopicName = (questionText: string): string => {
-      // Map common question patterns to concise subtopic names
-      const lowerQuestion = questionText.toLowerCase();
-      
-      if (lowerQuestion.includes('calculus')) return 'Calculus';
-      if (lowerQuestion.includes('algebra')) return 'Algebra';
-      if (lowerQuestion.includes('derivative')) return 'Derivatives';
-      if (lowerQuestion.includes('integral')) return 'Integrals';
-      if (lowerQuestion.includes('limit')) return 'Limits';
-      if (lowerQuestion.includes('linear equation')) return 'Linear Equations';
-      if (lowerQuestion.includes('quadratic')) return 'Quadratics';
-      if (lowerQuestion.includes('polynomial')) return 'Polynomials';
-      if (lowerQuestion.includes('factor')) return 'Factoring';
-      if (lowerQuestion.includes('system')) return 'Systems';
-      if (lowerQuestion.includes('inequalit')) return 'Inequalities';
-      if (lowerQuestion.includes('mathematics') || lowerQuestion.includes('math')) return 'Overview';
-      
-      // Fallback: use first few words
-      const words = questionText.split(' ').slice(0, 3);
-      return words.join(' ').replace(/[?.,!]/g, '');
-    };
     
     // Helper function to build subtree recursively
-    const buildSubtree = (node: APINode, level: number): TreeNode => {
+    const buildSubtree = (node: APINode): TreeNode => {
       const children = groups[node._id] || [];
-      
+      const isSubtopic = (node.parent_node_ids?.length ?? 0) === 0;
+
       return {
         id: node._id,
-        name: level === 1 ? getSubtopicName(node.question_text) : 
-              node.question_text.slice(0, 50) + (node.question_text.length > 50 ? '...' : ''),
-        type: level === 1 ? 'subtopic' as const : 'thread' as const,
-        children: children.map(child => buildSubtree(child, level + 1)),
+        name: isSubtopic 
+          ? (node.question_text.includes('calculus') ? 'Calculus' : 'Algebra')
+          : node.question_text.slice(0, 50) + (node.question_text.length > 50 ? '...' : ''),
+        type: isSubtopic ? 'subtopic' : 'thread',
+        children: children
+          .sort((a, b) => {
+            const aHasChildren = (groups[a._id] || []).length > 0;
+            const bHasChildren = (groups[b._id] || []).length > 0;
+            if (aHasChildren && !bHasChildren) return -1;
+            if (!aHasChildren && bHasChildren) return 1;
+            return a.question_text.localeCompare(b.question_text);
+          })
+          .map(child => buildSubtree(child)),
         nodeIds: [node._id, ...children.flatMap(child => getAllNodeIds(child))]
       };
     };
@@ -88,7 +76,7 @@ const KnowledgeGraph: React.FC<{ graphId: string }> = ({ graphId }) => {
         id: 'root',
         name: topic || 'Knowledge Base',
         type: 'topic',
-        children: rootNodes.map(rootNode => buildSubtree(rootNode, 1)),
+        children: rootNodes.map(rootNode => buildSubtree(rootNode)),
         nodeIds: items.map(n => n._id)
       }
     ];
