@@ -79,7 +79,7 @@ def create_mock_data():
     math_graph = {
         "_id": "thinkex-demo",
         "user_id": "student-123",
-        "topic": "Mathematics Study Session",
+        "topic": "Math",
         "nodes": [
             # Subtopic 1: Calculus Introduction
             {
