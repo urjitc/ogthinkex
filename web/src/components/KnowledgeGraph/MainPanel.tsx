@@ -1,13 +1,13 @@
 import React from 'react';
 import QACard from './QACard';
-import type { APINode } from './types';
+import type { QAPair } from './KnowledgeGraph';
 
 interface MainPanelProps {
   viewMode: 'list' | 'graph';
-  filteredItems: APINode[];
+  filteredItems: QAPair[];
   searchQuery: string;
   onOpenCardDetail: (cardId: string) => void;
-  onAddItemToContext: (item: APINode) => void;
+  onAddItemToContext: (item: QAPair) => void;
 }
 
 const MainPanel: React.FC<MainPanelProps> = ({
@@ -28,10 +28,10 @@ const MainPanel: React.FC<MainPanelProps> = ({
           ) : (
             filteredItems.map(item => (
               <QACard
-                key={item._id}
+                key={item.question}
                 item={item}
-                onOpenDetail={() => onOpenCardDetail(item._id)}
-                onAddItemToContext={() => onAddItemToContext(item)}
+                onOpenDetail={() => onOpenCardDetail(item.question)}
+                onOpenModal={() => onAddItemToContext(item)}
               />
             ))
           )}

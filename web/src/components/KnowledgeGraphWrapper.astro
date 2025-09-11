@@ -2,7 +2,7 @@
 // Astro wrapper component for the KnowledgeGraph React component
 // This follows Astro best practices for integrating React components
 
-import KnowledgeGraph from './KnowledgeGraph/KnowledgeGraph';
+import KnowledgeGraphWrapper from './KnowledgeGraph/KnowledgeGraphWrapper';
 import LoadingState from './LoadingState.astro';
 
 // Props interface for TypeScript support
@@ -26,7 +26,7 @@ const { graphId, title = "Knowledge Base", description = "Explore and organize y
     This ensures the component is interactive as soon as the page loads
   -->
   <div id="knowledge-graph-container" style="display: none;">
-    <KnowledgeGraph graphId={graphId} client:load />
+    <KnowledgeGraphWrapper graphId={graphId} client:load />
   </div>
 </div>
 
