@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import { FaFolder, FaFile, FaLink, FaQuestion } from 'react-icons/fa';
 import type { TreeNode } from './types';
 
 interface SidebarProps {
@@ -29,12 +30,12 @@ const TreeNodeComponent: React.FC<{
   return (
     <div>
       <div
-        className={`flex items-center px-2 py-1.5 rounded-md cursor-pointer text-sm ${
+        className={`flex items-center px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
           selected
-            ? 'bg-indigo-50 text-indigo-700'
-            : 'text-gray-700 hover:bg-gray-100'
+            ? 'bg-blue-900 text-blue-200 border border-blue-800'
+            : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
         }`}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{ paddingLeft: `${level * 32 + 8}px` }}
         onClick={() => {
           if (selected && hasChildren) {
             onToggle(node.id);
@@ -49,7 +50,7 @@ const TreeNodeComponent: React.FC<{
               e.stopPropagation();
               onToggle(node.id);
             }}
-            className="mr-2 p-0.5 hover:bg-gray-200 rounded"
+            className="mr-2 p-0.5 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200"
           >
             <svg
               className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
@@ -64,19 +65,19 @@ const TreeNodeComponent: React.FC<{
         
         <div className="flex items-center flex-1 min-w-0">
           <div className={`mr-2 ${
-            node.type === 'topic' ? 'text-indigo-600' :
-            node.type === 'subtopic' ? 'text-gray-600' :
+            node.type === 'topic' ? 'text-blue-400' :
+            node.type === 'subtopic' ? 'text-gray-400' :
             'text-gray-500'
           }`}>
-            {node.type === 'topic' && '📁'}
-            {node.type === 'subtopic' && '📄'}
-            {node.type === 'thread' && (hasChildren ? '🔗' : '❓')}
+            {node.type === 'topic' && <FaFolder className="w-4 h-4" />}
+            {node.type === 'subtopic' && <FaFile className="w-4 h-4" />}
+            {node.type === 'thread' && (hasChildren ? <FaLink className="w-4 h-4" /> : <FaQuestion className="w-4 h-4" />)}
           </div>
           <span className="truncate">{node.name}</span>
         </div>
         
         {node.nodeIds.length > 0 && !(node.type === 'thread' && !hasChildren) && (
-          <span className="ml-2 text-xs text-gray-400">
+          <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">
             {node.nodeIds.length}
           </span>
         )}
@@ -113,51 +114,152 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSearchChange,
   onToggleSidebar,
 }) => {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Detect platform for keyboard shortcut display
+  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const shortcutKey = isMac ? '⌘K' : 'Ctrl+K';
+  
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+K on Mac or Ctrl+K on Windows/Linux
+      if ((event.metaKey && isMac) || (event.ctrlKey && !isMac)) {
+        if (event.key === 'k' || event.key === 'K') {
+          event.preventDefault();
+          if (sidebarCollapsed) {
+            // Open sidebar and focus search
+            onToggleSidebar();
+            setTimeout(() => {
+              if (searchInputRef.current) {
+                searchInputRef.current.focus();
+              }
+            }, 300);
+          } else if (searchInputRef.current) {
+            // Just focus search if sidebar is already open
+            searchInputRef.current.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMac, sidebarCollapsed, onToggleSidebar]);
   return (
-    <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${
-      sidebarCollapsed ? 'w-16' : 'w-64'
-    }`}>
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-        {!sidebarCollapsed && (
-          <h2 className="text-lg font-semibold text-gray-900">ThinkEx</h2>
-        )}
+    <div
+      className={`h-screen bg-zinc-950 border-r border-gray-700 transition-all duration-300 flex flex-col ${
+        sidebarCollapsed ? 'w-16' : 'w-64'
+      }`}
+    >
+      {/* --- Header --- */}
+      <div
+        className={`flex items-center h-16 px-4 border-b border-gray-700 flex-shrink-0 transition-all duration-300 ${
+          sidebarCollapsed ? 'justify-center' : 'justify-between'
+        }`}
+      >
+        <div
+          className={`flex items-center space-x-2 overflow-hidden transition-all duration-300 ${
+            sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'
+          }`}
+        >
+          <img
+            src="/logo.png"
+            alt="ThinkEx Logo"
+            className="w-5 h-9 rounded-lg object-contain"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg items-center justify-center hidden">
+            <span className="text-white font-bold text-sm">T</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-100 whitespace-nowrap">ThinkEx</h2>
+        </div>
+
         <button
           onClick={onToggleSidebar}
-          className="p-1 rounded-md hover:bg-gray-100"
+          className="p-1 rounded-md hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
         >
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <svg
+            className={`w-5 h-5 transition-transform duration-300 ${
+              sidebarCollapsed ? 'rotate-180' : 'rotate-0'
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
       </div>
-      
-      {!sidebarCollapsed && (
-        <div className="p-4">
-          <div className="relative mb-4">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+
+      {/* --- Search Area --- */}
+      <div className="px-3 py-4 flex-shrink-0">
+        <div className="relative h-10">
+          <div
+            className={`absolute top-1/2 -translate-y-1/2 ${
+              sidebarCollapsed ? 'left-1/2 -translate-x-1/2' : 'left-3'
+            }`}
+          >
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
-          
-          <div className="space-y-1">
-            {treeStructure.map(node => (
-              <TreeNodeComponent
-                key={node.id}
-                node={node}
-                level={0}
-                expandedNodes={expandedNodes}
-                selectedNodeId={selectedNodeId}
-                onToggle={onToggleNode}
-                onSelect={onSelectNode}
-              />
-            ))}
+
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder={sidebarCollapsed ? '' : 'Search...'}
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onClick={() => {
+              if (sidebarCollapsed) {
+                onToggleSidebar();
+                setTimeout(() => searchInputRef.current?.focus(), 300);
+              }
+            }}
+            className={`w-full h-full text-sm rounded-md text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent search-focus-glow transition-all duration-300 ${
+              sidebarCollapsed
+                ? 'bg-transparent border-transparent cursor-pointer'
+                : 'bg-gray-700 border border-gray-600 pl-10 pr-16'
+            }`}
+          />
+
+          <div
+            className={`absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2 pointer-events-none transition-opacity duration-300 ${
+              sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            <span className="text-sm text-gray-400 font-mono">{shortcutKey}</span>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* --- Tree Navigation --- */}
+      <div
+        className={`flex-1 overflow-y-auto overflow-x-hidden px-4 transition-all duration-300 ${
+          sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'
+        }`}
+      >
+        <div className="space-y-1 pb-4">
+          {treeStructure.map((node) => (
+            <TreeNodeComponent
+              key={node.id}
+              node={node}
+              level={0}
+              expandedNodes={expandedNodes}
+              selectedNodeId={selectedNodeId}
+              onToggle={onToggleNode}
+              onSelect={onSelectNode}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
