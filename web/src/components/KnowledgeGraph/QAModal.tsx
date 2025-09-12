@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { QAPair } from './KnowledgeGraph';
+import { MarkdownText } from '@/components/assistant-ui/markdown-text';
 
 interface QAModalProps {
   isOpen: boolean;
@@ -60,7 +61,7 @@ const QAModal: React.FC<QAModalProps> = ({ isOpen, qaItem, onClose }) => {
       />
       
       {/* Modal content */}
-      <div className={`relative bg-zinc-950/90 rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden border border-zinc-800 z-10 transition-all duration-300 ${show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+      <div className={`relative bg-zinc-950/50 rounded-3xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden border border-zinc-800 z-10 transition-all duration-300 ${show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
         {/* Modal body */}
         <div className="flex flex-col p-6 max-h-[calc(90vh-80px)] relative">
           {/* Close button - positioned absolutely in top right */}
@@ -100,7 +101,9 @@ const QAModal: React.FC<QAModalProps> = ({ isOpen, qaItem, onClose }) => {
               Answer
             </h3>
             <div className="flex-1 min-h-0 p-4 overflow-y-auto custom-scrollbar">
-              <div className="whitespace-pre-wrap text-gray-200">{qaItem.answer}</div>
+              <div className="text-gray-200">
+                <MarkdownText content={qaItem.answer} />
+              </div>
             </div>
           </div>
 
