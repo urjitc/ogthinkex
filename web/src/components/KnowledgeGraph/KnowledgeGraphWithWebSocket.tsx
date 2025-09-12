@@ -257,19 +257,6 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
 
       <style>
         {`
-          @keyframes glow {
-            0%, 100% { 
-              box-shadow: inset 0 0 0px #3b82f6, inset 0 0 0px #3b82f6;
-              border-color: currentColor;
-            }
-            50% { 
-              box-shadow: inset 0 0 0px #3b82f6, inset 0 0 20px #3b82f680;
-              border-color: #3b82f6;
-            }
-          }
-          .animate-glow {
-            animation: glow 0.8s ease-in-out;
-          }
           
           .search-focus-glow:focus {
             box-shadow: inset 0 0 0px #3b82f6, inset 0 0 20px #3b82f680;
@@ -311,10 +298,11 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       </style>
 
       {/* Left Sidebar */}
-      <Sidebar
+            <Sidebar
         treeStructure={sidebarStructure}
         expandedNodes={expandedNodes}
         selectedNodeId={selectedNodeId}
+        animatedNodeId={animatedNodeId}
         searchQuery={searchQuery}
         sidebarCollapsed={sidebarCollapsed}
         onToggleNode={toggleNodeExpanded}

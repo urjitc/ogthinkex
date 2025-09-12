@@ -6,6 +6,7 @@ interface SidebarProps {
   treeStructure: TreeNode[];
   expandedNodes: Set<string>;
   selectedNodeId: string | null;
+  animatedNodeId?: string | null;
   searchQuery: string;
   sidebarCollapsed: boolean;
   onToggleNode: (nodeId: string) => void;
@@ -20,29 +21,38 @@ const TreeNodeComponent: React.FC<{
   level: number;
   expandedNodes: Set<string>;
   selectedNodeId: string | null;
+  animatedNodeId?: string | null;
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
-}> = ({ node, level, expandedNodes, selectedNodeId, onToggle, onSelect }) => {
+}> = ({ node, level, expandedNodes, selectedNodeId, onToggle, onSelect, animatedNodeId }) => {
   const hasChildren = node.children.length > 0;
   const expanded = expandedNodes.has(node.id);
   const selected = selectedNodeId === node.id;
+  const [isClicked, setIsClicked] = React.useState(false);
   
+  const handleClick = () => {
+    setIsClicked(true);
+    setTimeout(() => setIsClicked(false), 300);
+
+    if (selected && hasChildren) {
+      onToggle(node.id);
+    } else {
+      onSelect(node.id);
+    }
+  };
+
   return (
     <div>
       <div
         className={`flex items-center px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
-          selected
+          node.id === animatedNodeId ? 'animate-glow' : ''
+        } ${
+          isClicked
             ? 'bg-blue-900 text-blue-200 border border-blue-800'
             : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
         }`}
         style={{ paddingLeft: `${level * 32 + 8}px` }}
-        onClick={() => {
-          if (selected && hasChildren) {
-            onToggle(node.id);
-          } else {
-            onSelect(node.id);
-          }
-        }}
+        onClick={handleClick}
       >
         {hasChildren && (
           <button
@@ -92,6 +102,7 @@ const TreeNodeComponent: React.FC<{
               level={level + 1}
               expandedNodes={expandedNodes}
               selectedNodeId={selectedNodeId}
+              animatedNodeId={animatedNodeId}
               onToggle={onToggle}
               onSelect={onSelect}
             />
@@ -107,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   treeStructure,
   expandedNodes,
   selectedNodeId,
+  animatedNodeId,
   searchQuery,
   sidebarCollapsed,
   onToggleNode,
@@ -254,6 +266,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               level={0}
               expandedNodes={expandedNodes}
               selectedNodeId={selectedNodeId}
+              animatedNodeId={animatedNodeId}
               onToggle={onToggleNode}
               onSelect={onSelectNode}
             />
