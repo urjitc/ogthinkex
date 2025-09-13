@@ -1,12 +1,12 @@
 ---
 import background from '../assets/background.svg';
-import ClusterListWrapper from './ClusterListWrapper.astro';
+import KnowledgeGraph from './KnowledgeGraph.tsx';
 ---
 
 <div id="container">
     <img id="background" src={background.src} alt="" fetchpriority="high" />
     <main>
-        <ClusterListWrapper graphId="thinkex-demo" />
+        <KnowledgeGraph graphId="thinkex-demo" client:load />
     </main>
 
 </div>

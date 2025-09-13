@@ -62,7 +62,7 @@ function AblyRealtimeHandler({ children }: { children: ReactNode }) {
   });
 
   // Subscribe to knowledge graph updates channel
-  const { publish } = useChannel('cluster-list-updates', 'server-update', (msg) => {
+  const { publish } = useChannel('knowledge-graph-updates', 'server-update', (msg) => {
     try {
       console.log('📨 Received Ably message:', {
         name: msg.name,
@@ -74,8 +74,8 @@ function AblyRealtimeHandler({ children }: { children: ReactNode }) {
       const data = msg.data;
 
       switch (data.type) {
-        case 'cluster_list_update':
-          queryClient.invalidateQueries({ queryKey: ['clusterList'] });
+        case 'knowledge_graph_update':
+          queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
           break;
         case 'node_update':
           queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
@@ -140,7 +140,7 @@ export function AblyProvider({ children }: { children: ReactNode }) {
 
   return (
     <AblyReactProvider client={ablyClient}>
-      <ChannelProvider channelName="cluster-list-updates">
+      <ChannelProvider channelName="knowledge-graph-updates">
         <AblyRealtimeHandler>
           {children}
         </AblyRealtimeHandler>

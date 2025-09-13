@@ -2,7 +2,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { WebSocketProvider } from '../../contexts/WebSocketContext';
-import ClusterListWithWebSocket from './ClusterListWithWebSocket';
+import KnowledgeGraphWithWebSocket from './KnowledgeGraphWithWebSocket';
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -14,18 +14,18 @@ const queryClient = new QueryClient({
   },
 });
 
-interface ClusterListWrapperProps {
+interface KnowledgeGraphWrapperProps {
   graphId?: string;
 }
 
-const ClusterListWrapper: React.FC<ClusterListWrapperProps> = ({ graphId }) => {
+const KnowledgeGraphWrapper: React.FC<KnowledgeGraphWrapperProps> = ({ graphId }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-        <ClusterListWithWebSocket graphId={graphId} />
+        <KnowledgeGraphWithWebSocket graphId={graphId} />
       </WebSocketProvider>
     </QueryClientProvider>
   );
 };
 
-export default ClusterListWrapper;
+export default KnowledgeGraphWrapper;
