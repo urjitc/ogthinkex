@@ -1,7 +1,0 @@
-# netlify.toml
-
-# Redirect rule to seamlessly redirect from the root to the knowledge graph page.
-[[redirects]]
-  from = "/"
-  to = "/knowledge-graph"
-  status = 301 # Permanent Redirect
