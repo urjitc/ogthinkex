@@ -390,7 +390,7 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
             'ttl': 3600 * 1000  # 1 hour in milliseconds
         }
         
-        token_request = await ably_rest.auth.create_token_request(token_request_params)
+        token_request = ably_rest.auth.create_token_request(token_request_params)
         print("Token request created successfully")
         print(f"Token request type: {type(token_request)}")
         print(f"Token request content: {token_request}")
