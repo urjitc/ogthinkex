@@ -47,6 +47,13 @@ class UpdateQAResponse(BaseModel):
     message: str
     qa_pair: QAPair
 
+class DeleteItemRequest(BaseModel):
+    clusterName: str
+    qa_id: Optional[str] = None # If null, delete the whole cluster
+
+class DeleteItemResponse(BaseModel):
+    message: str
+
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -550,6 +557,74 @@ async def add_qa(payload: AddQARequest):
                 message=f'Added Q/A to cluster "{DATA.clusters[idx].title}".',
                 cluster=DATA.clusters[idx]
             )
+
+@app.delete("/delete_item", response_model=DeleteItemResponse, operation_id="delete_item")
+async def delete_item(payload: DeleteItemRequest):
+    """
+    delete_item(clusterName, qa_id=None) -> deletes a Q/A or a whole cluster.
+    If qa_id is provided, only that Q/A is deleted.
+    If qa_id is omitted, the entire cluster is deleted.
+    """
+    cluster_name = payload.clusterName.strip()
+    if not cluster_name:
+        raise HTTPException(status_code=400, detail="clusterName must be non-empty")
+
+    with lock:
+        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name)
+        if cluster_idx is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
+
+        # Case 1: Delete a specific Q/A pair
+        if payload.qa_id:
+            cluster = DATA.clusters[cluster_idx]
+            qa_to_delete_idx = -1
+            for i, qa in enumerate(cluster.qas):
+                if qa.qa_id == payload.qa_id:
+                    qa_to_delete_idx = i
+                    break
+            
+            if qa_to_delete_idx == -1:
+                raise HTTPException(status_code=404, detail=f"Q/A with id '{payload.qa_id}' not found in cluster '{cluster_name}'.")
+
+            deleted_qa = cluster.qas.pop(qa_to_delete_idx)
+
+            # If the cluster becomes empty after deletion, remove the cluster itself
+            if not cluster.qas:
+                DATA.clusters.pop(cluster_idx)
+                await manager.broadcast({
+                    "type": "knowledge_graph_update",
+                    "action": "cluster_deleted",
+                    "payload": {
+                        "clusterName": cluster_name,
+                        "message": f'Cluster "{cluster_name}" was deleted after its last Q/A was removed.'
+                    }
+                })
+                return DeleteItemResponse(message=f'Deleted Q/A and empty cluster "{cluster_name}".')
+            else:
+                await manager.broadcast({
+                    "type": "knowledge_graph_update",
+                    "action": "qa_deleted",
+                    "payload": {
+                        "clusterName": cluster_name,
+                        "qa_id": payload.qa_id,
+                        "message": f'Deleted Q/A from cluster "{cluster_name}".'
+                    }
+                })
+                return DeleteItemResponse(message=f'Deleted Q/A from cluster "{cluster_name}".')
+
+        # Case 2: Delete the entire cluster
+        else:
+            deleted_cluster = DATA.clusters.pop(cluster_idx)
+            await manager.broadcast({
+                "type": "knowledge_graph_update",
+                "action": "cluster_deleted",
+                "payload": {
+                    "clusterName": cluster_name,
+                    "message": f'Cluster "{cluster_name}" has been deleted.'
+                }
+            })
+            return DeleteItemResponse(message=f'Cluster "{cluster_name}" has been deleted.')
+
 
 # WebSocket endpoint removed - now using Ably for real-time communication
 
