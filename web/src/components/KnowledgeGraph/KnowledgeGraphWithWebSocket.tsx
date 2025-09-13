@@ -30,7 +30,7 @@ export interface ClusterList {
 
 // Fetch function for React Query
 const fetchClusters = async (): Promise<ClusterList> => {
-  const response = await fetch('https://uninveighing-eve-flinchingly.ngrok-free.app/clusters', {
+  const response = await fetch('https://thinkex.onrender.com/clusters', {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
