@@ -61,6 +61,7 @@ origins = [
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:5173", # Default for Vite
+    "http://localhost:4322", # Astro dev server
     "https://thinkex.netlify.app",
     "https://thinkex.onrender.com",
     "https://uninveighing-eve-flinchingly.ngrok-free.app", # Existing ngrok URL
