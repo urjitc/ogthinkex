@@ -101,7 +101,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, 
             {cluster.title}
           </h3>
           <div className="flex items-center space-x-2">
-            <span className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded-full">
+            <span className="bg-zinc-950/50  text-gray-400 text-xs px-2 py-1 rounded-full">
               {cluster.qas.length}
             </span>
             <button className="text-gray-400 hover:text-gray-200">
