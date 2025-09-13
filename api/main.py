@@ -383,13 +383,30 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         print("Ably REST client created successfully")
         
         print("Calling create_token_request...")
-        token_request = await ably_rest.auth.create_token_request({'clientId': client_id})
+        # Create token request with proper parameters as per Ably docs
+        token_request_params = {
+            'clientId': client_id,
+            'capability': {'*': ['*']},  # Full access for now
+            'ttl': 3600 * 1000  # 1 hour in milliseconds
+        }
+        
+        token_request = await ably_rest.auth.create_token_request(token_request_params)
         print("Token request created successfully")
         print(f"Token request type: {type(token_request)}")
-        print(f"Token request keys: {token_request.keys() if hasattr(token_request, 'keys') else 'No keys method'}")
+        print(f"Token request content: {token_request}")
         
+        # Ensure we return a proper dictionary
+        if hasattr(token_request, '__dict__'):
+            result = {k: v for k, v in token_request.__dict__.items() if not k.startswith('_')}
+        elif isinstance(token_request, dict):
+            result = token_request
+        else:
+            # Convert to string representation if needed
+            result = str(token_request)
+            
+        print(f"Final result: {result}")
         print("=== ABLY TOKEN REQUEST SUCCESS ===")
-        return token_request
+        return result
     except ImportError as e:
         print(f"Import error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ably import error: {str(e)}")
