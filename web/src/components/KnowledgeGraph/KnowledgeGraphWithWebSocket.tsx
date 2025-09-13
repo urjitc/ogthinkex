@@ -28,7 +28,11 @@ export interface ClusterList {
 
 // Fetch function for React Query
 const fetchClusters = async (): Promise<ClusterList> => {
-  const response = await fetch('https://revilingly-oaten-salley.ngrok-free.app/clusters');
+  const response = await fetch('https://revilingly-oaten-salley.ngrok-free.app/clusters', {
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
+  });
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
