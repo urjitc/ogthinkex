@@ -25,6 +25,7 @@ class Cluster(BaseModel):
     qas: List[QAPair] = Field(default_factory=list)
 
 class ClusterList(BaseModel):
+    graph_id: str = Field(default_factory=lambda: str(uuid4()))
     title: str  # e.g., "calculus"
     clusters: List[Cluster] = Field(default_factory=list)
 
@@ -32,6 +33,9 @@ class AddQARequest(BaseModel):
     clusterName: str
     question: str
     answer: str
+
+class CreateKnowledgeGraphRequest(BaseModel):
+    title: str
 
 class AddQAResponse(BaseModel):
     message: str
@@ -192,165 +196,24 @@ async def shutdown_event():
 # Mock data per your spec:
 # - One ClusterList titled "calculus"
 # - Clusters are integration topics
-# DATA = ClusterList(
-#     title="Calculus",
-#     clusters=[
-#         Cluster(
-#             title="Substitution",
-#             qas=[
-#                 QAPair(
-#                     question="How do I recognize when to use u-substitution?",
-#                     answer="Look for a composite f(g(x)) where g'(x) appears elsewhere (up to a constant factor)."
-#                 ),
-#                 QAPair(
-#                     question="What if the derivative isn’t an exact match?",
-#                     answer="Factor out constants or rewrite the integrand; if only a constant is missing, multiply/divide by it."
-#                 ),
-#                 QAPair(
-#                     question="Common patterns for substitution?",
-#                     answer="Roots like √(ax+b), exponentials e^{ax+b}, logarithms ln(ax+b), and products f(g(x))·g'(x)."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Integration by Parts",
-#             qas=[
-#                 QAPair(
-#                     question="What is the integration by parts formula?",
-#                     answer="∫u dv = uv − ∫v du; pick u via LIATE/ILATE when unsure."
-#                 ),
-#                 QAPair(
-#                     question="When does tabular (DI) method help?",
-#                     answer="When u differentiates to 0 in a few steps (polynomials) and dv integrates repeatedly (e^x, sin, cos)."
-#                 ),
-#                 QAPair(
-#                     question="Classic targets for choosing u?",
-#                     answer="ln x, arctan x, algebraic factors with exponent ≥ 1."
-#                 ),
-#                 QAPair(
-#                     question="What about ∫e^{ax}cos(bx) dx?",
-#                     answer="Apply IBP twice or use the standard result: ∫e^{ax}cos(bx)dx = e^{ax}(a cos bx + b sin bx)/(a^2+b^2)+C."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Partial Fractions",
-#             qas=[
-#                 QAPair(
-#                     question="When can I use partial fractions?",
-#                     answer="For rational functions P/Q with deg P < deg Q and Q factorable over ℝ; do long division if deg P ≥ deg Q."
-#                 ),
-#                 QAPair(
-#                     question="How do I handle repeated linear factors?",
-#                     answer="Include terms A1/(x−r) + A2/(x−r)^2 + … up to the multiplicity."
-#                 ),
-#                 QAPair(
-#                     question="What about irreducible quadratics?",
-#                     answer="Use (Ax+B)/(ax^2+bx+c) for each irreducible quadratic factor."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Trigonometric Integrals",
-#             qas=[
-#                 QAPair(
-#                     question="How to approach ∫sin^m x cos^n x dx?",
-#                     answer="If one exponent is odd, peel one factor and use sin^2+cos^2=1 to convert the rest."
-#                 ),
-#                 QAPair(
-#                     question="Strategy for ∫tan^m x sec^n x dx?",
-#                     answer="If n is even, peel sec^2; if m is odd, peel sec·tan and convert using sec^2=1+tan^2."
-#                 ),
-#                 QAPair(
-#                     question="Power-reduction identities useful when?",
-#                     answer="When both exponents are even; convert with cos^2=(1+cos2x)/2, sin^2=(1−cos2x)/2."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Trigonometric Substitution",
-#             qas=[
-#                 QAPair(
-#                     question="Which substitution for √(a^2 − x^2)?",
-#                     answer="x = a sin θ, dx = a cos θ dθ, and use 1−sin^2θ=cos^2θ."
-#                 ),
-#                 QAPair(
-#                     question="Which substitution for √(a^2 + x^2)?",
-#                     answer="x = a tan θ, dx = a sec^2 θ dθ, and 1+tan^2θ=sec^2θ."
-#                 ),
-#                 QAPair(
-#                     question="Which substitution for √(x^2 − a^2)?",
-#                     answer="x = a sec θ, dx = a sec θ tan θ dθ, and sec^2θ−1=tan^2θ."
-#                 ),
-#                 QAPair(
-#                     question="How do I back-substitute cleanly?",
-#                     answer="Draw a reference triangle from the substitution to express sinθ, cosθ, tanθ in terms of x and a."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Improper Integrals",
-#             qas=[
-#                 QAPair(
-#                     question="How do I test convergence of ∫_1^∞ 1/x^p dx?",
-#                     answer="Converges iff p>1; diverges otherwise (p-test)."
-#                 ),
-#                 QAPair(
-#                     question="What about ∫_0^1 x^{−p} dx?",
-#                     answer="Converges iff p<1; diverges otherwise."
-#                 ),
-#                 QAPair(
-#                     question="When to use comparison vs limit comparison?",
-#                     answer="Use direct comparison with clear inequalities; use limit comparison when functions are asymptotically proportional."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Reduction Formulas",
-#             qas=[
-#                 QAPair(
-#                     question="What is a reduction formula?",
-#                     answer="A recurrence expressing ∫f_n in terms of ∫f_{n−1} (e.g., ∫sin^n x dx)."
-#                 ),
-#                 QAPair(
-#                     question="Example for sin^n x?",
-#                     answer="∫sin^n x dx = −(sin^{n−1}x cos x)/n + ((n−1)/n)∫sin^{n−2}x dx."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Numerical Integration",
-#             qas=[
-#                 QAPair(
-#                     question="When to use Trapezoidal vs Simpson’s?",
-#                     answer="Trapezoidal is O(h^2) and simple; Simpson’s is O(h^4) but needs an even number of subintervals and smooth f."
-#                 ),
-#                 QAPair(
-#                     question="How to control error quickly?",
-#                     answer="Halve h and compare results; Richardson extrapolation can accelerate convergence."
-#                 )
-#             ]
-#         ),
-#         Cluster(
-#             title="Integration Strategy",
-#             qas=[
-#                 QAPair(
-#                     question="What’s a good general checklist?",
-#                     answer="Simplify → try substitution → trig identities → parts → partial fractions → trig sub → numeric if needed."
-#                 ),
-#                 QAPair(
-#                     question="Quick algebraic rewrites that help?",
-#                     answer="Split sums, factor constants, complete the square, rationalize, or rewrite powers with identities."
-#                 )
-#             ]
-#         )
-#     ]
-# )
-DATA = ClusterList(title="Knowledge Base", clusters=[])
+KNOWLEDGE_GRAPHS: dict[str, ClusterList] = {}
+DEFAULT_GRAPH_ID = "default_graph"
 
-def _find_cluster_idx_case_insensitive(name: str) -> Optional[int]:
+def initialize_data():
+    """Set up the initial default knowledge graph."""
+    if DEFAULT_GRAPH_ID not in KNOWLEDGE_GRAPHS:
+        KNOWLEDGE_GRAPHS[DEFAULT_GRAPH_ID] = ClusterList(graph_id=DEFAULT_GRAPH_ID, title="Default Knowledge Base", clusters=[])
+
+@app.on_event("startup")
+async def startup_event_data():
+    initialize_data()
+
+def _find_cluster_idx_case_insensitive(graph_id: str, name: str) -> Optional[int]:
     name_norm = name.strip().lower()
-    for i, c in enumerate(DATA.clusters):
+    graph = KNOWLEDGE_GRAPHS.get(graph_id)
+    if not graph:
+        return None
+    for i, c in enumerate(graph.clusters):
         if c.title.strip().lower() == name_norm:
             return i
     return None
@@ -418,20 +281,33 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate Ably token: {str(e)}")
 
+@app.post("/knowledge-graphs", response_model=ClusterList, operation_id="create_knowledge_graph")
+def create_knowledge_graph(payload: CreateKnowledgeGraphRequest):
+    """
+    create_knowledge_graph(title) -> creates a new knowledge graph.
+    """
+    with lock:
+        new_graph = ClusterList(title=payload.title)
+        KNOWLEDGE_GRAPHS[new_graph.graph_id] = new_graph
+        return new_graph
+
 @app.get(
-    "/clusters", 
+    "/knowledge-graphs/{graph_id}/clusters", 
     response_model=ClusterList, 
     operation_id="get_clusters",
 )
-def get_clusters():
+def get_clusters(graph_id: str):
     """
-    get_clusters() -> returns the entire ClusterList
+    get_clusters(graph_id) -> returns the specified ClusterList
     """
     with lock:
-        return DATA
+        graph = KNOWLEDGE_GRAPHS.get(graph_id)
+        if not graph:
+            raise HTTPException(status_code=404, detail=f"Knowledge graph with id '{graph_id}' not found.")
+        return graph
 
-@app.post("/update_qa", response_model=UpdateQAResponse, operation_id="update_qa")
-async def update_qa(payload: UpdateQARequest):
+@app.post("/knowledge-graphs/{graph_id}/update_qa", response_model=UpdateQAResponse, operation_id="update_qa")
+async def update_qa(graph_id: str, payload: UpdateQARequest):
     """
     update_qa(clusterName, qa_id, question, answer) -> updates a Q/A in the named cluster.
     At least one of question or answer must be provided.
@@ -445,11 +321,15 @@ async def update_qa(payload: UpdateQARequest):
         raise HTTPException(status_code=400, detail="At least one of 'question' or 'answer' must be provided for an update.")
 
     with lock:
-        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name)
+        graph = KNOWLEDGE_GRAPHS.get(graph_id)
+        if not graph:
+            raise HTTPException(status_code=404, detail=f"Knowledge graph with id '{graph_id}' not found.")
+
+        cluster_idx = _find_cluster_idx_case_insensitive(graph_id, cluster_name)
         if cluster_idx is None:
             raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
 
-        cluster = DATA.clusters[cluster_idx]
+        cluster = graph.clusters[cluster_idx]
         qa_to_update = None
         qa_idx = -1
 
@@ -477,7 +357,7 @@ async def update_qa(payload: UpdateQARequest):
                 qa_pair=qa_to_update
             )
 
-        DATA.clusters[cluster_idx].qas[qa_idx] = qa_to_update
+        graph.clusters[cluster_idx].qas[qa_idx] = qa_to_update
 
         await manager.broadcast({
             "type": "knowledge_graph_update",
@@ -494,8 +374,8 @@ async def update_qa(payload: UpdateQARequest):
             qa_pair=qa_to_update
         )
 
-@app.post("/add_qa", response_model=AddQAResponse, operation_id="add_qa")
-async def add_qa(payload: AddQARequest):
+@app.post("/knowledge-graphs/{graph_id}/add_qa", response_model=AddQAResponse, operation_id="add_qa")
+async def add_qa(graph_id: str, payload: AddQARequest):
     """
     add_qa(clusterName, question, answer) -> adds a Q/A to the named cluster.
     If the cluster doesn't exist, it will be created.
@@ -509,13 +389,17 @@ async def add_qa(payload: AddQARequest):
         raise HTTPException(status_code=400, detail="answer must be non-empty")
 
     with lock:
-        idx = _find_cluster_idx_case_insensitive(cluster_name)
+        graph = KNOWLEDGE_GRAPHS.get(graph_id)
+        if not graph:
+            raise HTTPException(status_code=404, detail=f"Knowledge graph with id '{graph_id}' not found.")
+
+        idx = _find_cluster_idx_case_insensitive(graph_id, cluster_name)
         qa = QAPair(question=payload.question.strip(), answer=payload.answer.strip())
 
         if idx is None:
             # create new cluster
             new_cluster = Cluster(title=cluster_name, qas=[qa])
-            DATA.clusters.append(new_cluster)
+            graph.clusters.append(new_cluster)
             
             # Broadcast the update to all connected clients
             await manager.broadcast({
@@ -533,22 +417,22 @@ async def add_qa(payload: AddQARequest):
             )
         else:
             # append to existing cluster
-            DATA.clusters[idx].qas.append(qa)
+            graph.clusters[idx].qas.append(qa)
             
             # Broadcast the update to all connected clients
             await manager.broadcast({
                 "type": "knowledge_graph_update",
                 "action": "qa_added",
                 "payload": {
-                    "cluster": DATA.clusters[idx].dict(),
+                    "cluster": graph.clusters[idx].dict(),
                     "new_qa": qa.dict(),
-                    "message": f'Added Q/A to cluster "{DATA.clusters[idx].title}".'
+                    "message": f'Added Q/A to cluster "{graph.clusters[idx].title}".'
                 }
             })
             
             return AddQAResponse(
-                message=f'Added Q/A to cluster "{DATA.clusters[idx].title}".',
-                cluster=DATA.clusters[idx]
+                message=f'Added Q/A to cluster "{graph.clusters[idx].title}".',
+                cluster=graph.clusters[idx]
             )
 
 # WebSocket endpoint removed - now using Ably for real-time communication
@@ -563,8 +447,8 @@ class DeleteClusterResponse(BaseModel):
     message: str
     clusterName: str
 
-@app.delete("/qa/{qa_id}", response_model=DeleteQAResponse, operation_id="delete_qa")
-async def delete_qa(qa_id: str, clusterName: str):
+@app.delete("/knowledge-graphs/{graph_id}/qa/{qa_id}", response_model=DeleteQAResponse, operation_id="delete_qa")
+async def delete_qa(graph_id: str, qa_id: str, clusterName: str):
     """
     delete_qa(qa_id, clusterName) -> deletes a Q/A from the named cluster.
     """
@@ -573,11 +457,15 @@ async def delete_qa(qa_id: str, clusterName: str):
         raise HTTPException(status_code=400, detail="clusterName must be non-empty")
 
     with lock:
-        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name)
+        graph = KNOWLEDGE_GRAPHS.get(graph_id)
+        if not graph:
+            raise HTTPException(status_code=404, detail=f"Knowledge graph with id '{graph_id}' not found.")
+
+        cluster_idx = _find_cluster_idx_case_insensitive(graph_id, cluster_name)
         if cluster_idx is None:
             raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
 
-        cluster = DATA.clusters[cluster_idx]
+        cluster = graph.clusters[cluster_idx]
         qa_to_delete_idx = -1
         for i, qa in enumerate(cluster.qas):
             if qa.qa_id == qa_id:
@@ -605,8 +493,8 @@ async def delete_qa(qa_id: str, clusterName: str):
             clusterName=cluster.title
         )
 
-@app.delete("/cluster/{cluster_name}", response_model=DeleteClusterResponse, operation_id="delete_cluster")
-async def delete_cluster(cluster_name: str):
+@app.delete("/knowledge-graphs/{graph_id}/cluster/{cluster_name}", response_model=DeleteClusterResponse, operation_id="delete_cluster")
+async def delete_cluster(graph_id: str, cluster_name: str):
     """
     delete_cluster(cluster_name) -> deletes a cluster and all its Q/As.
     """
@@ -615,12 +503,16 @@ async def delete_cluster(cluster_name: str):
         raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
 
     with lock:
-        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name_stripped)
+        cluster_idx = _find_cluster_idx_case_insensitive(graph_id, cluster_name_stripped)
         if cluster_idx is None:
             raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name_stripped}' not found.")
 
-        deleted_cluster_title = DATA.clusters[cluster_idx].title
-        del DATA.clusters[cluster_idx]
+        graph = KNOWLEDGE_GRAPHS.get(graph_id)
+        if not graph:
+            raise HTTPException(status_code=404, detail=f"Knowledge graph with id '{graph_id}' not found.")
+
+        deleted_cluster_title = graph.clusters[cluster_idx].title
+        del graph.clusters[cluster_idx]
 
         await manager.broadcast({
             "type": "knowledge_graph_update",
@@ -641,4 +533,5 @@ async def delete_cluster(cluster_name: str):
 # -----------------------------
 @app.get("/", tags=["meta"])
 def root():
-    return {"status": "ok", "title": DATA.title, "clusters_count": len(DATA.clusters)}
+    with lock:
+        return {"status": "ok", "knowledge_graphs_count": len(KNOWLEDGE_GRAPHS)}
