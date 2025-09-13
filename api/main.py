@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 import os
 import asyncio
-from ably import AblyRealtime
+from ably import AblyRealtime, AblyRest
 
 # -----------------------------
 # 1) Data Models (Pydantic)
@@ -349,6 +349,28 @@ def _find_cluster_idx_case_insensitive(name: str) -> Optional[int]:
 # -----------------------------
 # 4) Endpoints for GPT Actions
 # -----------------------------
+
+@app.get("/ably-token-request")
+async def ably_token_request(clientId: Optional[str] = Query(None)):
+    """
+    Generate Ably token for secure client authentication
+    """
+    if not ABLY_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Missing ABLY_API_KEY environment variable"
+        )
+    
+    # Use provided clientId or generate a default one
+    client_id = clientId or f"thinkex-client-{datetime.utcnow().timestamp()}"
+    
+    try:
+        # Create Ably REST client for token generation
+        ably_rest = AblyRest(ABLY_API_KEY)
+        token_request = await ably_rest.auth.create_token_request(client_id=client_id)
+        return token_request
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate Ably token: {str(e)}")
 
 @app.get(
     "/clusters", 

@@ -6,7 +6,7 @@ import { AblyProvider as AblyReactProvider, ChannelProvider, useAbly as useAblyH
 // Create Ably client with token authentication
 const createAblyClient = () => {
   return new Ably.Realtime({ 
-    authUrl: `/.netlify/functions/ably-token-request?clientId=thinkex-client-${Date.now()}` 
+    authUrl: `https://thinkex.onrender.com/ably-token-request?clientId=thinkex-client-${Date.now()}` 
   });
 };
 
