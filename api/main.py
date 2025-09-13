@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import uuid4, UUID
 from threading import Lock
 from datetime import datetime
@@ -280,6 +280,15 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate Ably token: {str(e)}")
+
+@app.get("/knowledge-graphs", response_model=List[ClusterList], operation_id="get_all_knowledge_graphs")
+def get_all_knowledge_graphs():
+    """
+    get_all_knowledge_graphs() -> returns a list of all knowledge graphs.
+    """
+    with lock:
+        return list(KNOWLEDGE_GRAPHS.values())
+
 
 @app.post("/knowledge-graphs", response_model=ClusterList, operation_id="create_knowledge_graph")
 def create_knowledge_graph(payload: CreateKnowledgeGraphRequest):
