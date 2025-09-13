@@ -6,36 +6,39 @@ interface SidebarProps {
   treeStructure: TreeNode[];
   expandedNodes: Set<string>;
   selectedNodeId: string | null;
+  selectedListId: string | null;
   animatedNodeId?: string | null;
   searchQuery: string;
   sidebarCollapsed: boolean;
   onToggleNode: (nodeId: string) => void;
   onSelectNode: (nodeId: string) => void;
+  onSelectList: (listId: string) => void;
   onSearchChange: (query: string) => void;
   onToggleSidebar: () => void;
 }
 
-// --- TreeNode Component for Sidebar ---
 const TreeNodeComponent: React.FC<{
   node: TreeNode;
   level: number;
   expandedNodes: Set<string>;
   selectedNodeId: string | null;
+  selectedListId: string | null;
   animatedNodeId?: string | null;
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
-}> = ({ node, level, expandedNodes, selectedNodeId, onToggle, onSelect, animatedNodeId }) => {
+  onSelectList: (listId: string) => void;
+}> = ({ node, level, expandedNodes, selectedNodeId, selectedListId, onToggle, onSelect, onSelectList, animatedNodeId }) => {
   const hasChildren = node.children.length > 0;
   const expanded = expandedNodes.has(node.id);
-  const selected = selectedNodeId === node.id;
-  const [isClicked, setIsClicked] = React.useState(false);
-  
-  const handleClick = () => {
-    setIsClicked(true);
-    setTimeout(() => setIsClicked(false), 300);
+  const isListSelected = selectedListId === node.id;
+  const isNodeSelected = selectedNodeId === node.id;
 
-    if (selected && hasChildren) {
-      onToggle(node.id);
+  const handleClick = () => {
+    if (node.type === 'topic') {
+      onSelectList(node.id);
+      if (!expanded) {
+        onToggle(node.id);
+      }
     } else {
       onSelect(node.id);
     }
@@ -45,16 +48,16 @@ const TreeNodeComponent: React.FC<{
     <div>
       <div
         className={`flex items-center px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
-          node.id === animatedNodeId ? 'animate-glow' : ''
+          isListSelected && level === 0 ? 'bg-gray-800 font-semibold text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
         } ${
-          isClicked
-            ? 'bg-blue-900 text-blue-200 border border-blue-800'
-            : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
+          isNodeSelected && level > 0 ? 'bg-blue-900/50 text-blue-200' : ''
+        } ${
+          node.id === animatedNodeId ? 'animate-glow' : ''
         }`}
-        style={{ paddingLeft: `${level * 32 + 8}px` }}
+        style={{ paddingLeft: `${level * 24 + 8}px` }}
         onClick={handleClick}
       >
-        {hasChildren && (
+        {(hasChildren || (node.type === 'topic' && level === 0)) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -102,9 +105,11 @@ const TreeNodeComponent: React.FC<{
               level={level + 1}
               expandedNodes={expandedNodes}
               selectedNodeId={selectedNodeId}
+              selectedListId={selectedListId}
               animatedNodeId={animatedNodeId}
               onToggle={onToggle}
               onSelect={onSelect}
+              onSelectList={onSelectList}
             />
           ))}
         </div>
@@ -113,33 +118,31 @@ const TreeNodeComponent: React.FC<{
   );
 };
 
-// --- Main Sidebar Component ---
 const Sidebar: React.FC<SidebarProps> = ({
   treeStructure,
   expandedNodes,
   selectedNodeId,
+  selectedListId,
   animatedNodeId,
   searchQuery,
   sidebarCollapsed,
   onToggleNode,
   onSelectNode,
+  onSelectList,
   onSearchChange,
   onToggleSidebar,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Detect platform for keyboard shortcut display
   const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   const shortcutKey = isMac ? '⌘K' : 'Ctrl+K';
   
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Cmd+K on Mac or Ctrl+K on Windows/Linux
       if ((event.metaKey && isMac) || (event.ctrlKey && !isMac)) {
         if (event.key === 'k' || event.key === 'K') {
           event.preventDefault();
           if (sidebarCollapsed) {
-            // Open sidebar and focus search
             onToggleSidebar();
             setTimeout(() => {
               if (searchInputRef.current) {
@@ -147,7 +150,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               }
             }, 300);
           } else if (searchInputRef.current) {
-            // Just focus search if sidebar is already open
             searchInputRef.current.focus();
           }
         }
@@ -159,13 +161,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isMac, sidebarCollapsed, onToggleSidebar]);
+
   return (
     <div
       className={`h-screen bg-zinc-950 border-r border-gray-700 transition-all duration-300 flex flex-col ${
         sidebarCollapsed ? 'w-16' : 'w-64'
       }`}
     >
-      {/* --- Header --- */}
       <div
         className={`flex items-center h-16 px-4 border-b border-gray-700 flex-shrink-0 transition-all duration-300 ${
           sidebarCollapsed ? 'justify-center' : 'justify-between'
@@ -210,7 +212,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* --- Search Area --- */}
       <div className="px-3 py-4 flex-shrink-0">
         <div className="relative h-10">
           <div
@@ -252,7 +253,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* --- Tree Navigation --- */}
       <div
         className={`flex-1 overflow-y-auto overflow-x-hidden px-4 transition-all duration-300 ${
           sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'
@@ -266,9 +266,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               level={0}
               expandedNodes={expandedNodes}
               selectedNodeId={selectedNodeId}
+              selectedListId={selectedListId}
               animatedNodeId={animatedNodeId}
               onToggle={onToggleNode}
               onSelect={onSelectNode}
+              onSelectList={onSelectList}
             />
           ))}
         </div>

@@ -2,11 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 import ClusterListWrapper from '../components/ClusterListWrapper.astro';
 
-const graphId = "default"; // The backend will serve the default list
 ---
 
 <Layout title="ThinkEx - Cluster List">
 	<main>
-		<ClusterListWrapper graphId={graphId} />
+		<ClusterListWrapper />
 	</main>
 </Layout>
