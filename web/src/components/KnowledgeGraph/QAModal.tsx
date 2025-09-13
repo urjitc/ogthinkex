@@ -64,7 +64,7 @@ const QAModal: React.FC<QAModalProps> = ({ isOpen, qaItem, onClose }) => {
       {/* Modal content */}
       <div className={`relative bg-zinc-950/60 rounded-3xl shadow-2xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden border border-zinc-800 z-10 transition-all duration-300 ${show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
         <div className="flex h-[90vh]">
-          <TableOfContents />
+          {/*<TableOfContents />*/}
           {/* Modal body */}
           <div className="flex-1 flex flex-col p-6 max-h-[90vh] relative">
             {/* Close button - positioned absolutely in top right */}
