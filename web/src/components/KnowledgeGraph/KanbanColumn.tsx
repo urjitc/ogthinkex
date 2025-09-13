@@ -2,15 +2,16 @@ import React, { useMemo } from 'react';
 import type { Cluster, QAPair } from './KnowledgeGraphWithWebSocket';
 import QACard from './QACard';
 
+import { useState, useRef, useEffect } from 'react';
+
 interface KanbanColumnProps {
   cluster: Cluster;
-  onOpenCardDetail: (cardId: string) => void;
   onOpenQAModal: (qaItem: QAPair) => void;
+  onDeleteQA: (qaId: string, clusterName: string) => void;
+  onDeleteCluster: (clusterName: string) => void;
   isAnimated: boolean;
   columnIndex: number;
   animatedItems: { [key: string]: string };
-  itemsToDelete: Set<string>;
-  onToggleItemForDeletion: (qaId: string) => void;
 }
 
 // Global array to track used colors for adjacent column checking
@@ -69,7 +70,21 @@ const getStatusColor = (title: string, columnIndex: number) => {
   return colors[colorIndex];
 };
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, onOpenQAModal, isAnimated, columnIndex, animatedItems, itemsToDelete, onToggleItemForDeletion }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onDeleteQA, onDeleteCluster, isAnimated, columnIndex, animatedItems }) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   const statusColors = useMemo(() => getStatusColor(cluster.title, columnIndex), [cluster.title, columnIndex]);
   
   return (
@@ -107,11 +122,33 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, 
             <span className="bg-zinc-950/50  text-gray-400 text-xs px-2 py-1 rounded-full">
               {cluster.qas.length}
             </span>
-            <button className="text-gray-400 hover:text-gray-200">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-              </svg>
-            </button>
+            <div className="relative" ref={dropdownRef}>
+              <button 
+                onClick={() => setDropdownOpen(!dropdownOpen)} 
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-10 border border-gray-700">
+                  <ul className="py-1">
+                    <li>
+                      <button 
+                        onClick={() => { 
+                          onDeleteCluster(cluster.title); 
+                          setDropdownOpen(false); 
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300"
+                      >
+                        Delete Cluster
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
@@ -121,11 +158,9 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, 
             <QACard 
               key={qa._id} 
               item={qa} 
-              onOpenDetail={() => onOpenCardDetail(qa.question)}
               onOpenModal={() => onOpenQAModal(qa)}
+              onDelete={() => onDeleteQA(qa._id, cluster.title)}
               animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}
-              isSelectedForDeletion={itemsToDelete.has(qa._id)}
-              onToggleSelection={() => onToggleItemForDeletion(qa._id)}
             />
           ))}
         </div>
