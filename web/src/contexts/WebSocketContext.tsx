@@ -11,15 +11,7 @@ const createAblyClient = () => {
   console.log('🔧 Creating Ably client with:', { clientId, authUrl });
   
   // The Ably SDK will automatically handle token fetching and renewal via authUrl.
-  return new Ably.Realtime({ 
-    authUrl,
-    log: {
-      level: 4, // Verbose logging
-      handler: (msg: any) => {
-        console.log(`🔍 Ably Log [${msg.level}]:`, msg.msg);
-      }
-    }
-  });
+  return new Ably.Realtime({ authUrl });
 };
 
 interface AblyContextType {
@@ -43,7 +35,6 @@ function AblyRealtimeHandler({ children }: { children: ReactNode }) {
     console.log('🔄 Ably connection state changed:', {
       previous: stateChange.previous,
       current: stateChange.current,
-      event: stateChange.event,
       reason: stateChange.reason,
       retryIn: stateChange.retryIn
     });
@@ -62,7 +53,7 @@ function AblyRealtimeHandler({ children }: { children: ReactNode }) {
   });
 
   // Subscribe to knowledge graph updates channel
-  const { publish } = useChannel('cluster-list-updates', 'server-update', (msg) => {
+  const { channel, publish } = useChannel('knowledge-graph-updates', 'server-update', (msg) => {
     try {
       console.log('📨 Received Ably message:', {
         name: msg.name,
@@ -75,7 +66,13 @@ function AblyRealtimeHandler({ children }: { children: ReactNode }) {
 
       switch (data.type) {
         case 'cluster_list_update':
-          queryClient.invalidateQueries({ queryKey: ['clusterList'] });
+          const { list_id } = data.payload;
+          if (list_id) {
+            // Invalidate the specific list that was updated
+            queryClient.invalidateQueries({ queryKey: ['clusterList', list_id] });
+          }
+          // Also invalidate the query for all cluster lists to update the sidebar
+          queryClient.invalidateQueries({ queryKey: ['allClusterLists'] });
           break;
         case 'node_update':
           queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
@@ -140,7 +137,7 @@ export function AblyProvider({ children }: { children: ReactNode }) {
 
   return (
     <AblyReactProvider client={ablyClient}>
-      <ChannelProvider channelName="cluster-list-updates">
+      <ChannelProvider channelName="knowledge-graph-updates">
         <AblyRealtimeHandler>
           {children}
         </AblyRealtimeHandler>

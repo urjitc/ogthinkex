@@ -95,43 +95,38 @@ class AblyManager:
         self._connection_event = None
 
     async def initialize_realtime(self):
-        """Initialize Ably Realtime connection using async with pattern"""
+        """Initialize Ably Realtime connection."""
         if not self.ably_api_key:
             print("ABLY_API_KEY not found, cannot initialize Ably Realtime.")
-            return False
+            return
 
         try:
-            # Initialize the Ably Realtime client using async with
-            async with AblyRealtime(self.ably_api_key, client_id="thinkex-backend-server") as ably_realtime:
-                self.ably_realtime = ably_realtime
-                
-                # Set up connection state listener
-                def on_state_change(state_change):
-                    if state_change.current.value == "connected":
-                        print("Ably Realtime connected!")
-                    elif state_change.current.value == "failed":
-                        print(f"Ably Realtime connection failed: {state_change.reason}")
-                    else:
-                        print(f"Ably Realtime connection state: {state_change.current.value}")
-                
-                ably_realtime.connection.on(on_state_change)
-                await ably_realtime.connection.once_async("connected")
-                self.channel = ably_realtime.channels.get('knowledge-graph-updates')
-                print("Ably channel ready for broadcasting")
-                
-                # Keep connection alive using asyncio.Event()
-                self._connection_event = asyncio.Event()
-                await self._connection_event.wait()
-                
+            self.ably_realtime = AblyRealtime(self.ably_api_key, client_id="thinkex-backend-server")
+            print("Ably Realtime client created.")
+
+            def on_state_change(state_change):
+                if state_change.current == "connected":
+                    print("Ably Realtime connected!")
+                elif state_change.current == "failed":
+                    print(f"Ably Realtime connection failed: {state_change.reason}")
+                else:
+                    print(f"Ably Realtime connection state: {state_change.current}")
+
+            self.ably_realtime.connection.on(on_state_change)
+            await self.ably_realtime.connection.once_async("connected")
+            
+            self.channel = self.ably_realtime.channels.get('knowledge-graph-updates')
+            print("Ably channel ready for broadcasting")
+
         except Exception as e:
             print(f"Failed to initialize Ably Realtime client: {e}")
-            return False
-        
-        return True
+
+    def is_ready(self):
+        return self.channel is not None
 
     async def broadcast(self, message: dict):
         """Broadcast message to all connected clients via Ably"""
-        if not self.channel:
+        if not self.is_ready():
             print("Ably channel not available, skipping broadcast")
             return
         
@@ -142,10 +137,10 @@ class AblyManager:
             print(f"Failed to broadcast message via Ably: {e}")
 
     async def close(self):
-        """Signal to close the Ably connection"""
-        if self._connection_event:
-            self._connection_event.set()
-            print("Ably connection close signal sent")
+        """Close the Ably connection"""
+        if self.ably_realtime:
+            await self.ably_realtime.close()
+            print("Ably connection closed")
 
 # Global manager instance
 manager = None
@@ -165,15 +160,15 @@ async def startup_event():
         print("ABLY_API_KEY not found. Ably REST client not initialized.")
 
     # Start Ably Realtime connection as a background task
-    ably_task = asyncio.create_task(manager.initialize_realtime())
+    asyncio.create_task(manager.initialize_realtime())
     
     # Give it a moment to establish connection
-    await asyncio.sleep(2) # Increased sleep to allow for connection
+    await asyncio.sleep(2) # Allow time for connection
     
-    if manager.channel:
+    if manager.is_ready():
         print("Ably Realtime connection ready for broadcasting.")
     else:
-        print("Ably Realtime connection not available.")
+        print("Ably Realtime connection not yet available, will be ready in background.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -540,13 +535,9 @@ async def update_qa(payload: UpdateQARequest):
         cluster_list.clusters[cluster_idx].qas[qa_idx] = qa_to_update
 
         await manager.broadcast({
-            "type": "knowledge_graph_update",
-            "action": "qa_updated",
+            "type": "cluster_list_update",
             "payload": {
-                "cluster_list_id": cluster_list.id,
-                "clusterName": cluster.title,
-                "qa_pair": qa_to_update.dict(),
-                "message": f'Updated Q/A in cluster "{cluster.title}".'
+                "list_id": cluster_list.id
             }
         })
 
@@ -649,12 +640,9 @@ async def add_qa(payload: AddQARequest):
             
             # Broadcast the update to all connected clients
             await manager.broadcast({
-                "type": "knowledge_graph_update",
-                "action": "cluster_created",
+                "type": "cluster_list_update",
                 "payload": {
-                    "cluster_list_id": cluster_list.id,
-                    "cluster": new_cluster.dict(),
-                    "message": f'Created cluster "{new_cluster.title}" and added Q/A.'
+                    "list_id": cluster_list.id
                 }
             })
             
@@ -668,13 +656,9 @@ async def add_qa(payload: AddQARequest):
             
             # Broadcast the update to all connected clients
             await manager.broadcast({
-                "type": "knowledge_graph_update",
-                "action": "qa_added",
+                "type": "cluster_list_update",
                 "payload": {
-                    "cluster_list_id": cluster_list.id,
-                    "cluster": cluster_list.clusters[idx].dict(),
-                    "new_qa": qa.dict(),
-                    "message": f'Added Q/A to cluster "{cluster_list.clusters[idx].title}".'
+                    "list_id": cluster_list.id
                 }
             })
             
@@ -784,13 +768,9 @@ async def delete_qa(qa_id: str, clusterName: str, cluster_list_id: str):
         del cluster.qas[qa_to_delete_idx]
 
         await manager.broadcast({
-            "type": "knowledge_graph_update",
-            "action": "qa_deleted",
+            "type": "cluster_list_update",
             "payload": {
-                "cluster_list_id": cluster_list.id,
-                "qa_id": qa_id,
-                "clusterName": cluster.title,
-                "message": f'Deleted Q/A from cluster "{cluster.title}".'
+                "list_id": cluster_list.id
             }
         })
 
@@ -865,12 +845,9 @@ async def delete_cluster(cluster_name: str, cluster_list_id: str):
         del cluster_list.clusters[cluster_idx]
 
         await manager.broadcast({
-            "type": "knowledge_graph_update",
-            "action": "cluster_deleted",
+            "type": "cluster_list_update",
             "payload": {
-                "cluster_list_id": cluster_list.id,
-                "clusterName": deleted_cluster_title,
-                "message": f'Deleted cluster "{deleted_cluster_title}".'
+                "list_id": cluster_list_id
             }
         })
 

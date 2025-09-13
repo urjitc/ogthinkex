@@ -7,12 +7,11 @@ import LoadingState from './LoadingState.astro';
 
 // Props interface for TypeScript support
 interface Props {
-  graphId: string;
   title?: string;
   description?: string;
 }
 
-const { graphId, title = "Cluster List", description = "Explore and organize your clusters with interactive Q&A cards" } = Astro.props;
+const { title = "Cluster List", description = "Explore and organize your clusters with interactive Q&A cards" } = Astro.props;
 ---
 
 <div class="cluster-list-container">
@@ -26,7 +25,7 @@ const { graphId, title = "Cluster List", description = "Explore and organize you
     This ensures the component is interactive as soon as the page loads
   -->
   <div id="cluster-list-container" style="display: none;">
-    <ClusterListWrapper graphId={graphId} client:load />
+    <ClusterListWrapper client:load />
   </div>
 </div>
 

@@ -6,15 +6,13 @@ import ClusterListWithWebSocket from './ClusterListWithWebSocket';
 const queryClient = new QueryClient();
 
 
-interface ClusterListProvidersProps {
-  listId: string;
-}
+interface ClusterListProvidersProps {}
 
-const ClusterListProviders: React.FC<ClusterListProvidersProps> = ({ listId }) => {
+const ClusterListProviders: React.FC<ClusterListProvidersProps> = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-          <ClusterListWithWebSocket listId={listId} />
+          <ClusterListWithWebSocket />
       </WebSocketProvider>
     </QueryClientProvider>
   );
