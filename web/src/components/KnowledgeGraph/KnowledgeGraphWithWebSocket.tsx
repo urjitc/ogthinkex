@@ -28,7 +28,7 @@ export interface ClusterList {
 
 // Fetch function for React Query
 const fetchClusters = async (): Promise<ClusterList> => {
-  const response = await fetch('http://127.0.0.1:8000/clusters');
+  const response = await fetch('https://revilingly-oaten-salley.ngrok-free.app/clusters');
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
