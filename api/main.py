@@ -383,7 +383,7 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         print("Ably REST client created successfully")
         
         print("Calling create_token_request...")
-        token_request = ably_rest.auth.create_token_request(client_id=client_id)
+        token_request = ably_rest.auth.create_token_request({'clientId': client_id})
         print("Token request created successfully")
         print(f"Token request type: {type(token_request)}")
         print(f"Token request keys: {token_request.keys() if hasattr(token_request, 'keys') else 'No keys method'}")
