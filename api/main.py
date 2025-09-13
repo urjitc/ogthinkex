@@ -202,7 +202,7 @@ DEFAULT_GRAPH_ID = "default_graph"
 def initialize_data():
     """Set up the initial default knowledge graph."""
     if DEFAULT_GRAPH_ID not in KNOWLEDGE_GRAPHS:
-        KNOWLEDGE_GRAPHS[DEFAULT_GRAPH_ID] = ClusterList(graph_id=DEFAULT_GRAPH_ID, title="Default Knowledge Base", clusters=[])
+        KNOWLEDGE_GRAPHS[DEFAULT_GRAPH_ID] = ClusterList(graph_id=DEFAULT_GRAPH_ID, title="Base", clusters=[])
 
 @app.on_event("startup")
 async def startup_event_data():
