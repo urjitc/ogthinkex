@@ -390,23 +390,11 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
             'ttl': 3600 * 1000  # 1 hour in milliseconds
         }
         
+        # Create and return the token request. Ably SDKs expect a dictionary.
         token_request = ably_rest.auth.create_token_request(token_request_params)
-        print("Token request created successfully")
-        print(f"Token request type: {type(token_request)}")
-        print(f"Token request content: {token_request}")
-        
-        # Ensure we return a proper dictionary
-        if hasattr(token_request, '__dict__'):
-            result = {k: v for k, v in token_request.__dict__.items() if not k.startswith('_')}
-        elif isinstance(token_request, dict):
-            result = token_request
-        else:
-            # Convert to string representation if needed
-            result = str(token_request)
-            
-        print(f"Final result: {result}")
+        print(f"Token request created successfully: {token_request}")
         print("=== ABLY TOKEN REQUEST SUCCESS ===")
-        return result
+        return token_request
     except ImportError as e:
         print(f"Import error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ably import error: {str(e)}")

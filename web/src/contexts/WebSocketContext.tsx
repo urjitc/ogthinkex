@@ -10,53 +10,9 @@ const createAblyClient = () => {
   
   console.log('🔧 Creating Ably client with:', { clientId, authUrl });
   
+  // The Ably SDK will automatically handle token fetching and renewal via authUrl.
   return new Ably.Realtime({ 
     authUrl,
-    authCallback: async (tokenParams: any, callback: any) => {
-      console.log('🔐 Ably authCallback triggered with params:', tokenParams);
-      
-      try {
-        console.log('📡 Fetching token from:', authUrl);
-        const response = await fetch(authUrl);
-        
-        console.log('📡 Token request response status:', response.status);
-        console.log('📡 Token request response headers:', Object.fromEntries(response.headers.entries()));
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Token request failed:', { status: response.status, statusText: response.statusText, body: errorText });
-          callback(new Error(`Token request failed: ${response.status} ${response.statusText}`), null);
-          return;
-        }
-        
-        const tokenData = await response.json();
-        console.log('✅ Token data received:', tokenData);
-        console.log('✅ Token data type:', typeof tokenData);
-        console.log('✅ Token data keys:', Object.keys(tokenData || {}));
-        
-        // Validate token data structure
-        if (!tokenData) {
-          console.error('❌ Token data is null or undefined');
-          callback(new Error('Token data is null'), null);
-          return;
-        }
-        
-        if (typeof tokenData === 'string') {
-          console.log('✅ Returning string token:', tokenData.substring(0, 50) + '...');
-          callback(null, tokenData);
-        } else if (typeof tokenData === 'object') {
-          console.log('✅ Returning object token with keys:', Object.keys(tokenData));
-          callback(null, tokenData);
-        } else {
-          console.error('❌ Unexpected token data type:', typeof tokenData);
-          callback(new Error(`Unexpected token type: ${typeof tokenData}`), null);
-        }
-        
-      } catch (error) {
-        console.error('❌ Token request error:', error);
-        callback(error, null);
-      }
-    },
     log: {
       level: 4, // Verbose logging
       handler: (msg: any) => {
