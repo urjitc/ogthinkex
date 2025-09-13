@@ -94,7 +94,8 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
     return clusterData.clusters.flatMap(cluster => cluster.qas);
   }, [clusterData]);
 
-  const { animatedItems, scrollToItemId } = useAnimation(allItems, [allItems]);
+  const [animationsEnabled, setAnimationsEnabled] = useState(false);
+  const { animatedItems, scrollToItemId } = useAnimation(allItems, [allItems], animationsEnabled);
 
   const filteredClusters = useMemo(() => {
     if (!clusterData) return [];
@@ -116,6 +117,13 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       })
       .filter((cluster): cluster is Cluster => cluster !== null);
   }, [clusterData, searchQuery]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      // Enable animations only after the initial data has loaded.
+      setAnimationsEnabled(true);
+    }
+  }, [isLoading]);
 
   // Effect for scrolling to a selected cluster from the sidebar
   useEffect(() => {
