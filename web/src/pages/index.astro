@@ -1,4 +1,13 @@
 ---
-// Redirect to knowledge platform
-return Astro.redirect('/knowledge-graph');
+import Layout from '../layouts/Layout.astro';
+import KnowledgeGraphWrapper from '../components/KnowledgeGraphWrapper.astro';
+
+// Use the default graph ID for the main page
+const graphId = "default_graph";
 ---
+
+<Layout title="ThinkEx - Knowledge Base">
+  <main>
+    <KnowledgeGraphWrapper graphId={graphId} />
+  </main>
+</Layout>
