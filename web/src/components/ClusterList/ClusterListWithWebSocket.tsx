@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import Sidebar from './Sidebar';
 import BreadcrumbBar from './BreadcrumbBar';
@@ -75,6 +75,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     queryKey: ['clusterList', selectedListId],
     queryFn: () => fetchClusterList(selectedListId),
     enabled: !!selectedListId, // Only run if a list is selected
+    placeholderData: keepPreviousData,
   });
 
     const deleteClusterMutation = useMutation({
@@ -333,18 +334,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   };
 
 
-    if (areListsLoading) return (
-    <div className="flex items-center justify-center h-screen bg-gray-900">
-      <div className="text-gray-300">Loading knowledge bases...</div>
-    </div>
-  );
-
-  if (isLoading) return (
-    <div className="flex items-center justify-center h-screen bg-gray-900">
-      <div className="text-gray-300">Loading knowledge base...</div>
-    </div>
-  );
-  
+    
   if (error) return (
     <div className="flex items-center justify-center h-screen bg-gray-900">
       <div className="text-red-400">Error: {(error as Error).message}</div>

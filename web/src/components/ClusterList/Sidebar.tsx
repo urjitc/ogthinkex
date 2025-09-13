@@ -50,8 +50,6 @@ const TreeNodeComponent: React.FC<{
         className={`flex items-center px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
           isListSelected && level === 0 ? 'bg-gray-800 font-semibold text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
         } ${
-          isNodeSelected && level > 0 ? 'bg-blue-900/50 text-blue-200' : ''
-        } ${
           node.id === animatedNodeId ? 'animate-glow' : ''
         }`}
         style={{ paddingLeft: `${level * 24 + 8}px` }}

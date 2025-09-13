@@ -3,7 +3,6 @@
 // This follows Astro best practices for integrating React components
 
 import ClusterListWrapper from './ClusterList/ClusterListWrapper';
-import LoadingState from './LoadingState.astro';
 
 // Props interface for TypeScript support
 interface Props {
@@ -15,36 +14,15 @@ const { title = "Cluster List", description = "Explore and organize your cluster
 ---
 
 <div class="cluster-list-container">
-  <!-- Loading state that shows before React component hydrates -->
-  <div id="loading-state">
-    <LoadingState message="Loading knowledge platform..." />
-  </div>
-  
   <!-- 
     React component with client:load directive for immediate hydration
     This ensures the component is interactive as soon as the page loads
   -->
-  <div id="cluster-list-container" style="display: none;">
+  <div id="cluster-list-container">
     <ClusterListWrapper client:load />
   </div>
 </div>
 
-<script>
-  // Progressive enhancement: Hide loading state and show React component
-  // This ensures a smooth transition from loading to interactive state
-  document.addEventListener('DOMContentLoaded', () => {
-    const loadingState = document.getElementById('loading-state');
-    const clusterListContainer = document.getElementById('cluster-list-container');
-    
-    if (loadingState && clusterListContainer) {
-      // Small delay to ensure React component has started hydrating
-      setTimeout(() => {
-        loadingState.style.display = 'none';
-        clusterListContainer.style.display = 'block';
-      }, 100);
-    }
-  });
-</script>
 
 <style>
   .cluster-list-container {
