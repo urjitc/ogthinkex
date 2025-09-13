@@ -56,13 +56,20 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Allow all origins for development, or be more specific in production
-# For example, to allow all netlify subdomains and localhost:
-origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app|https://uninveighing-eve-flinchingly.ngrok-free.app|https://thinkex.onrender.com"
+# Define allowed origins. Using a list is more explicit and less error-prone than regex.
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:5173", # Default for Vite
+    "https://thinkex.netlify.app",
+    "https://thinkex.onrender.com",
+    "https://uninveighing-eve-flinchingly.ngrok-free.app", # Existing ngrok URL
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=origins_regex,
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*--thinkex\.netlify\.app", # For Netlify deploy previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
