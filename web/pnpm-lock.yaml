@@ -71,6 +71,9 @@ importers:
       dagre:
         specifier: ^0.8.5
         version: 0.8.5
+      dotenv:
+        specifier: ^17.2.2
+        version: 17.2.2
       katex:
         specifier: ^0.16.22
         version: 0.16.22
@@ -2220,6 +2223,10 @@ packages:
 
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+    engines: {node: '>=12'}
+
+  dotenv@17.2.2:
+    resolution: {integrity: sha512-Sf2LSQP+bOlhKWWyhFsn0UsfdK/kCWRv1iuA2gXAwt3dyNabr6QSj00I2V10pidqz69soatm9ZwZvpQMTIOd5Q==}
     engines: {node: '>=12'}
 
   dset@3.1.4:
@@ -6742,6 +6749,8 @@ snapshots:
       type-fest: 4.41.0
 
   dotenv@16.6.1: {}
+
+  dotenv@17.2.2: {}
 
   dset@3.1.4: {}
 
