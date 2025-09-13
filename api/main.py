@@ -37,6 +37,10 @@ class AddQARequest(BaseModel):
 class CreateKnowledgeGraphRequest(BaseModel):
     title: str
 
+class KnowledgeGraphInfo(BaseModel):
+    graph_id: str
+    title: str
+
 class AddQAResponse(BaseModel):
     message: str
     cluster: Cluster
@@ -280,6 +284,14 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate Ably token: {str(e)}")
+
+@app.get("/knowledge-graphs/info", response_model=List[KnowledgeGraphInfo], operation_id="get_all_knowledge_graph_info")
+def get_all_knowledge_graph_info():
+    """
+    get_all_knowledge_graph_info() -> returns a list of all knowledge graphs with their IDs and titles.
+    """
+    with lock:
+        return [KnowledgeGraphInfo(graph_id=graph.graph_id, title=graph.title) for graph in KNOWLEDGE_GRAPHS.values()]
 
 @app.get("/knowledge-graphs", response_model=List[ClusterList], operation_id="get_all_knowledge_graphs")
 def get_all_knowledge_graphs():
