@@ -1,0 +1,4 @@
+[[redirects]]
+  from = "/"
+  to = "/knowledge-graph"
+  status = 301 # Permanent Redirect

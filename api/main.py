@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Set
+from uuid import uuid4, UUID
 from threading import Lock
 from datetime import datetime
 import json
@@ -11,6 +12,7 @@ import json
 # 1) Data Models (Pydantic)
 # -----------------------------
 class QAPair(BaseModel):
+    qa_id: str = Field(default_factory=lambda: str(uuid4()))
     question: str
     answer: str
     created_at: Optional[str] = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
@@ -32,6 +34,16 @@ class AddQAResponse(BaseModel):
     message: str
     cluster: Cluster
 
+class UpdateQARequest(BaseModel):
+    clusterName: str
+    qa_id: str
+    question: Optional[str] = None
+    answer: Optional[str] = None
+
+class UpdateQAResponse(BaseModel):
+    message: str
+    qa_pair: QAPair
+
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -43,7 +55,7 @@ app = FastAPI(
 
 # Allow all origins for development, or be more specific in production
 # For example, to allow all netlify subdomains and localhost:
-origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app"
+origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app|https://uninveighing-eve-flinchingly.ngrok-free.app"
 
 app.add_middleware(
     CORSMiddleware,
@@ -267,10 +279,74 @@ def _find_cluster_idx_case_insensitive(name: str) -> Optional[int]:
 )
 def get_clusters():
     """
-    get_clusters() -> returns the entire ClusterList ("calculus" and all clusters with Q/A pairs, but without the answers)
+    get_clusters() -> returns the entire ClusterList
     """
     with lock:
         return DATA
+
+@app.post("/update_qa", response_model=UpdateQAResponse, operation_id="update_qa")
+async def update_qa(payload: UpdateQARequest):
+    """
+    update_qa(clusterName, qa_id, question, answer) -> updates a Q/A in the named cluster.
+    At least one of question or answer must be provided.
+    """
+    cluster_name = payload.clusterName.strip()
+    if not cluster_name:
+        raise HTTPException(status_code=400, detail="clusterName must be non-empty")
+    if not payload.qa_id:
+        raise HTTPException(status_code=400, detail="qa_id must be non-empty")
+    if payload.question is None and payload.answer is None:
+        raise HTTPException(status_code=400, detail="At least one of 'question' or 'answer' must be provided for an update.")
+
+    with lock:
+        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name)
+        if cluster_idx is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
+
+        cluster = DATA.clusters[cluster_idx]
+        qa_to_update = None
+        qa_idx = -1
+
+        for i, qa in enumerate(cluster.qas):
+            if qa.qa_id == payload.qa_id:
+                qa_to_update = qa
+                qa_idx = i
+                break
+        
+        if qa_to_update is None:
+            raise HTTPException(status_code=404, detail=f"Q/A with id '{payload.qa_id}' not found in cluster '{cluster_name}'.")
+
+        updated = False
+        if payload.question is not None and payload.question.strip() and payload.question.strip() != qa_to_update.question:
+            qa_to_update.question = payload.question.strip()
+            updated = True
+        
+        if payload.answer is not None and payload.answer.strip() and payload.answer.strip() != qa_to_update.answer:
+            qa_to_update.answer = payload.answer.strip()
+            updated = True
+
+        if not updated:
+            return UpdateQAResponse(
+                message="No changes detected.",
+                qa_pair=qa_to_update
+            )
+
+        DATA.clusters[cluster_idx].qas[qa_idx] = qa_to_update
+
+        await manager.broadcast({
+            "type": "knowledge_graph_update",
+            "action": "qa_updated",
+            "payload": {
+                "clusterName": cluster.title,
+                "qa_pair": qa_to_update.dict(),
+                "message": f'Updated Q/A in cluster "{cluster.title}".'
+            }
+        })
+
+        return UpdateQAResponse(
+            message=f'Updated Q/A in cluster "{cluster.title}".',
+            qa_pair=qa_to_update
+        )
 
 @app.post("/add_qa", response_model=AddQAResponse, operation_id="add_qa")
 async def add_qa(payload: AddQARequest):
