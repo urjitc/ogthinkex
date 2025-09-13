@@ -7,14 +7,14 @@ const queryClient = new QueryClient();
 
 
 interface ClusterListProvidersProps {
-  graphId: string;
+  listId: string;
 }
 
-const ClusterListProviders: React.FC<ClusterListProvidersProps> = ({ graphId }) => {
+const ClusterListProviders: React.FC<ClusterListProvidersProps> = ({ listId }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-          <ClusterListWithWebSocket graphId={graphId} />
+          <ClusterListWithWebSocket listId={listId} />
       </WebSocketProvider>
     </QueryClientProvider>
   );
