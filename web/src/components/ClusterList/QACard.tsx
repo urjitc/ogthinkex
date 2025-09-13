@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { QAPair } from './KnowledgeGraphWithWebSocket';
+import type { QAPair } from './ClusterListWithWebSocket';
 
 interface QACardProps {
   item: QAPair;
