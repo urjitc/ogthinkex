@@ -355,7 +355,8 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
     """
     Generate Ably token for secure client authentication
     """
-    if not ABLY_API_KEY:
+    ably_api_key = os.getenv('ABLY_API_KEY')
+    if not ably_api_key:
         raise HTTPException(
             status_code=500, 
             detail="Missing ABLY_API_KEY environment variable"
@@ -366,7 +367,7 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
     
     try:
         # Create Ably REST client for token generation
-        ably_rest = AblyRest(ABLY_API_KEY)
+        ably_rest = AblyRest(ably_api_key)
         token_request = await ably_rest.auth.create_token_request(client_id=client_id)
         return token_request
     except Exception as e:
