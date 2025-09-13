@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import Sidebar from './Sidebar';
 import BreadcrumbBar from './BreadcrumbBar';
 import KanbanColumn from './KanbanColumn';
 import MainPanel from './MainPanel';
-import RightDrawer from './RightDrawer';
 import QAModal from './QAModal';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 import type { TreeNode, BreadcrumbItem } from './types';
 import { useAnimation } from '../../hooks/use-animation';
-import ContextToolbar from './ContextToolbar';
 
 // Define types directly in the component for now
 export interface QAPair {
@@ -43,26 +42,74 @@ const fetchClusters = async (): Promise<ClusterList> => {
 };
 
 const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }) => {
+  const queryClient = useQueryClient();
   const { isConnected } = useWebSocket();
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [rightDrawerOpen, setRightDrawerOpen] = useState<boolean>(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [animatedNodeId, setAnimatedNodeId] = useState<string | null>(null);
   const animationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
-  const [itemsToDelete, setItemsToDelete] = useState<Set<string>>(new Set());
-  const [contextDrawerOpen, setContextDrawerOpen] = useState<boolean>(false);
+    const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'qa' | 'cluster' } | null>(null);
 
   // Use React Query to fetch data
   const { data: clusterData, isLoading, error } = useQuery({
     queryKey: ['knowledgeGraph'],
     queryFn: fetchClusters,
   });
+
+    const deleteClusterMutation = useMutation({
+    mutationFn: async (clusterName: string) => {
+      const response = await fetch(`https://thinkex.onrender.com/cluster/${encodeURIComponent(clusterName)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete cluster');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
+    },
+  });
+
+  const deleteQAMutation = useMutation({
+    mutationFn: async ({ qaId, clusterName }: { qaId: string; clusterName: string }) => {
+      const response = await fetch(`https://thinkex.onrender.com/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete Q/A item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
+    },
+  });
+
+    const handleDeleteQA = (qaId: string, clusterName: string) => {
+    setItemToDelete({ id: qaId, name: clusterName, type: 'qa' });
+  };
+
+  const handleDeleteCluster = (clusterName: string) => {
+    setItemToDelete({ id: clusterName, name: clusterName, type: 'cluster' });
+  };
+
+    const confirmDelete = () => {
+    if (!itemToDelete) return;
+
+    if (itemToDelete.type === 'qa') {
+      deleteQAMutation.mutate({ qaId: itemToDelete.id, clusterName: itemToDelete.name });
+    } else if (itemToDelete.type === 'cluster') {
+      deleteClusterMutation.mutate(itemToDelete.id);
+    }
+
+    setItemToDelete(null);
+  };
 
   // The new sidebar structure will be a simple list of clusters
   const sidebarStructure = useMemo(() => {
@@ -256,15 +303,6 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
     }, 1500);
   };
 
-  const openCardDetail = (cardId: string) => {
-    setSelectedCardId(cardId);
-    setRightDrawerOpen(true);
-  };
-
-  const closeDrawer = () => {
-    setRightDrawerOpen(false);
-    setSelectedCardId(null);
-  };
 
   const openQAModal = (qaItem: QAPair) => {
     setSelectedQAItem(qaItem);
@@ -276,54 +314,6 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
     setSelectedQAItem(null);
   };
 
-  const handleDelete = async () => {
-    if (itemsToDelete.size === 0) return;
-
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${itemsToDelete.size} item(s)? This action cannot be undone.`
-    );
-
-    if (!confirmDelete) return;
-
-    // For now, we only support deleting single QAs. Cluster deletion can be added later.
-    const promises = Array.from(itemsToDelete).map(itemId => {
-      // Find the cluster name for the given qa_id
-      const cluster = clusterData?.clusters.find(c => c.qas.some(q => q._id === itemId));
-      if (!cluster) return Promise.resolve();
-
-      return fetch('https://thinkex.onrender.com/delete_item', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ clusterName: cluster.title, qa_id: itemId }),
-      });
-    });
-
-    await Promise.all(promises);
-    setItemsToDelete(new Set()); // Clear selection after deletion
-  };
-
-  const toggleItemForDeletion = (qaId: string) => {
-    setItemsToDelete(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(qaId)) {
-        newSet.delete(qaId);
-      } else {
-        newSet.add(qaId);
-      }
-      return newSet;
-    });
-  };
-
-  const selectedCard = useMemo(() => {
-    if (!selectedCardId || !clusterData) return null;
-    for (const cluster of clusterData.clusters) {
-      const qa = cluster.qas.find(q => q.question === selectedCardId);
-      if (qa) return qa;
-    }
-    return null;
-  }, [selectedCardId, clusterData]);
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-screen bg-gray-900">
@@ -447,16 +437,15 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
           >
             <div className="flex gap-6 h-full px-6 pb-3">
               {filteredClusters.map((cluster, index) => (
-                <KanbanColumn 
+                                                <KanbanColumn 
                   key={cluster.title} 
                   cluster={cluster} 
-                  onOpenCardDetail={openCardDetail}
                   onOpenQAModal={openQAModal}
+                  onDeleteQA={handleDeleteQA}
+                  onDeleteCluster={handleDeleteCluster}
                   isAnimated={animatedNodeId === cluster.title}
                   columnIndex={index}
                   animatedItems={animatedItems}
-                  itemsToDelete={itemsToDelete}
-                  onToggleItemForDeletion={toggleItemForDeletion}
                 />
               ))}
               <div className="flex-shrink-0 w-px" />
@@ -470,31 +459,20 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
         </div>
       </div>
 
-      {/* Right Drawer */}
-      <RightDrawer
-        isOpen={rightDrawerOpen}
-        selectedCard={selectedCard ? { 
-          _id: selectedCard.question, 
-          question_text: selectedCard.question, 
-          answer_text: selectedCard.answer, 
-          parent_node_ids: [] 
-        } : null}
-        topic={clusterData?.title || ''}
-        allItems={[]}
-        onClose={closeDrawer}
-      />
 
       {/* QA Modal */}
-      <QAModal
+            <QAModal
         isOpen={modalOpen}
         qaItem={selectedQAItem}
         onClose={closeQAModal}
       />
 
-      <ContextToolbar 
-        onToggleDrawer={() => setContextDrawerOpen(!contextDrawerOpen)}
-        onDelete={handleDelete}
-        contextItemCount={itemsToDelete.size}
+      <DeleteConfirmationModal
+        isOpen={!!itemToDelete}
+        onClose={() => setItemToDelete(null)}
+        onConfirm={confirmDelete}
+        title={`Delete ${itemToDelete?.type === 'qa' ? 'Q/A Item' : 'Cluster'}`}
+        message={`Are you sure you want to delete this ${itemToDelete?.type === 'qa' ? 'item' : `cluster and all its content`}? This action cannot be undone.`}
       />
     </div>
   );

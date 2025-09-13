@@ -47,13 +47,6 @@ class UpdateQAResponse(BaseModel):
     message: str
     qa_pair: QAPair
 
-class DeleteItemRequest(BaseModel):
-    clusterName: str
-    qa_id: Optional[str] = None # If null, delete the whole cluster
-
-class DeleteItemResponse(BaseModel):
-    message: str
-
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -558,14 +551,24 @@ async def add_qa(payload: AddQARequest):
                 cluster=DATA.clusters[idx]
             )
 
-@app.delete("/delete_item", response_model=DeleteItemResponse, operation_id="delete_item")
-async def delete_item(payload: DeleteItemRequest):
+# WebSocket endpoint removed - now using Ably for real-time communication
+
+
+class DeleteQAResponse(BaseModel):
+    message: str
+    qa_id: str
+    clusterName: str
+
+class DeleteClusterResponse(BaseModel):
+    message: str
+    clusterName: str
+
+@app.delete("/qa/{qa_id}", response_model=DeleteQAResponse, operation_id="delete_qa")
+async def delete_qa(qa_id: str, clusterName: str):
     """
-    delete_item(clusterName, qa_id=None) -> deletes a Q/A or a whole cluster.
-    If qa_id is provided, only that Q/A is deleted.
-    If qa_id is omitted, the entire cluster is deleted.
+    delete_qa(qa_id, clusterName) -> deletes a Q/A from the named cluster.
     """
-    cluster_name = payload.clusterName.strip()
+    cluster_name = clusterName.strip()
     if not cluster_name:
         raise HTTPException(status_code=400, detail="clusterName must be non-empty")
 
@@ -574,59 +577,64 @@ async def delete_item(payload: DeleteItemRequest):
         if cluster_idx is None:
             raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
 
-        # Case 1: Delete a specific Q/A pair
-        if payload.qa_id:
-            cluster = DATA.clusters[cluster_idx]
-            qa_to_delete_idx = -1
-            for i, qa in enumerate(cluster.qas):
-                if qa.qa_id == payload.qa_id:
-                    qa_to_delete_idx = i
-                    break
-            
-            if qa_to_delete_idx == -1:
-                raise HTTPException(status_code=404, detail=f"Q/A with id '{payload.qa_id}' not found in cluster '{cluster_name}'.")
+        cluster = DATA.clusters[cluster_idx]
+        qa_to_delete_idx = -1
+        for i, qa in enumerate(cluster.qas):
+            if qa.qa_id == qa_id:
+                qa_to_delete_idx = i
+                break
+        
+        if qa_to_delete_idx == -1:
+            raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found in cluster '{cluster_name}'.")
 
-            deleted_qa = cluster.qas.pop(qa_to_delete_idx)
+        del cluster.qas[qa_to_delete_idx]
 
-            # If the cluster becomes empty after deletion, remove the cluster itself
-            if not cluster.qas:
-                DATA.clusters.pop(cluster_idx)
-                await manager.broadcast({
-                    "type": "knowledge_graph_update",
-                    "action": "cluster_deleted",
-                    "payload": {
-                        "clusterName": cluster_name,
-                        "message": f'Cluster "{cluster_name}" was deleted after its last Q/A was removed.'
-                    }
-                })
-                return DeleteItemResponse(message=f'Deleted Q/A and empty cluster "{cluster_name}".')
-            else:
-                await manager.broadcast({
-                    "type": "knowledge_graph_update",
-                    "action": "qa_deleted",
-                    "payload": {
-                        "clusterName": cluster_name,
-                        "qa_id": payload.qa_id,
-                        "message": f'Deleted Q/A from cluster "{cluster_name}".'
-                    }
-                })
-                return DeleteItemResponse(message=f'Deleted Q/A from cluster "{cluster_name}".')
+        await manager.broadcast({
+            "type": "knowledge_graph_update",
+            "action": "qa_deleted",
+            "payload": {
+                "qa_id": qa_id,
+                "clusterName": cluster.title,
+                "message": f'Deleted Q/A from cluster "{cluster.title}".'
+            }
+        })
 
-        # Case 2: Delete the entire cluster
-        else:
-            deleted_cluster = DATA.clusters.pop(cluster_idx)
-            await manager.broadcast({
-                "type": "knowledge_graph_update",
-                "action": "cluster_deleted",
-                "payload": {
-                    "clusterName": cluster_name,
-                    "message": f'Cluster "{cluster_name}" has been deleted.'
-                }
-            })
-            return DeleteItemResponse(message=f'Cluster "{cluster_name}" has been deleted.')
+        return DeleteQAResponse(
+            message=f'Deleted Q/A from cluster "{cluster.title}".',
+            qa_id=qa_id,
+            clusterName=cluster.title
+        )
 
+@app.delete("/cluster/{cluster_name}", response_model=DeleteClusterResponse, operation_id="delete_cluster")
+async def delete_cluster(cluster_name: str):
+    """
+    delete_cluster(cluster_name) -> deletes a cluster and all its Q/As.
+    """
+    cluster_name_stripped = cluster_name.strip()
+    if not cluster_name_stripped:
+        raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
 
-# WebSocket endpoint removed - now using Ably for real-time communication
+    with lock:
+        cluster_idx = _find_cluster_idx_case_insensitive(cluster_name_stripped)
+        if cluster_idx is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name_stripped}' not found.")
+
+        deleted_cluster_title = DATA.clusters[cluster_idx].title
+        del DATA.clusters[cluster_idx]
+
+        await manager.broadcast({
+            "type": "knowledge_graph_update",
+            "action": "cluster_deleted",
+            "payload": {
+                "clusterName": deleted_cluster_title,
+                "message": f'Deleted cluster "{deleted_cluster_title}".'
+            }
+        })
+
+        return DeleteClusterResponse(
+            message=f'Deleted cluster "{deleted_cluster_title}".',
+            clusterName=deleted_cluster_title
+        )
 
 # -----------------------------
 # 5) Health + Root (optional)
