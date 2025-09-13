@@ -50,6 +50,10 @@ class UpdateQAResponse(BaseModel):
     message: str
     qa_pair: QAPair
 
+class ClusterListInfo(BaseModel):
+    id: str
+    title: str
+
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -446,6 +450,14 @@ def get_all_cluster_lists():
     """
     with lock:
         return list(CLUSTER_LISTS.values())
+
+@app.get("/cluster-lists/info", response_model=List[ClusterListInfo], operation_id="get_all_cluster_list_info")
+def get_all_cluster_list_info():
+    """
+    get_all_cluster_list_info() -> returns all cluster lists with just their id and title.
+    """
+    with lock:
+        return [ClusterListInfo(id=cl.id, title=cl.title) for cl in CLUSTER_LISTS.values()]
 
 @app.get(
     "/cluster-lists/{cluster_list_id}", 
