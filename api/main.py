@@ -387,9 +387,22 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
         print("Calling create_token_request using shared client...")
         # Use the shared AblyRest client from the manager
         token_request = await manager.ably_rest.auth.create_token_request(token_request_params)
-        print(f"Token request created successfully: {token_request}")
+
+        # Manually construct a dictionary to avoid Python's name mangling in the JSON response.
+        # The Ably JS client expects keys like 'keyName', not '_TokenRequest__key_name'.
+        response_data = {
+            "keyName": token_request.key_name,
+            "clientId": token_request.client_id,
+            "nonce": token_request.nonce,
+            "mac": token_request.mac,
+            "capability": token_request.capability,
+            "ttl": token_request.ttl,
+            "timestamp": token_request.timestamp
+        }
+
+        print(f"Token request created successfully. Returning JSON: {response_data}")
         print("=== ABLY TOKEN REQUEST SUCCESS ===")
-        return token_request
+        return response_data
     except ImportError as e:
         print(f"Import error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ably import error: {str(e)}")
