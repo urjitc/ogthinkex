@@ -355,22 +355,53 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
     """
     Generate Ably token for secure client authentication
     """
+    print("=== ABLY TOKEN REQUEST START ===")
+    print(f"Received clientId parameter: {clientId}")
+    
+    # Check environment variable
     ably_api_key = os.getenv('ABLY_API_KEY')
+    print(f"ABLY_API_KEY exists: {ably_api_key is not None}")
+    if ably_api_key:
+        print(f"ABLY_API_KEY length: {len(ably_api_key)}")
+        print(f"ABLY_API_KEY starts with: {ably_api_key[:10]}...")
+    
     if not ably_api_key:
+        print("ERROR: ABLY_API_KEY not found in environment variables")
+        print(f"Available env vars: {list(os.environ.keys())}")
         raise HTTPException(
             status_code=500, 
             detail="Missing ABLY_API_KEY environment variable"
         )
     
-    # Use provided clientId or generate a default one
+    # Generate client ID
     client_id = clientId or f"thinkex-client-{datetime.utcnow().timestamp()}"
+    print(f"Using client_id: {client_id}")
     
     try:
-        # Create Ably REST client for token generation
+        print("Creating Ably REST client...")
         ably_rest = AblyRest(ably_api_key)
-        token_request = await ably_rest.auth.create_token_request(client_id=client_id)
+        print("Ably REST client created successfully")
+        
+        print("Calling create_token_request...")
+        token_request = ably_rest.auth.create_token_request(client_id=client_id)
+        print("Token request created successfully")
+        print(f"Token request type: {type(token_request)}")
+        print(f"Token request keys: {token_request.keys() if hasattr(token_request, 'keys') else 'No keys method'}")
+        
+        print("=== ABLY TOKEN REQUEST SUCCESS ===")
         return token_request
+    except ImportError as e:
+        print(f"Import error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ably import error: {str(e)}")
+    except AttributeError as e:
+        print(f"Attribute error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ably attribute error: {str(e)}")
     except Exception as e:
+        print(f"General error type: {type(e)}")
+        print(f"General error message: {str(e)}")
+        print(f"General error args: {e.args}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate Ably token: {str(e)}")
 
 @app.get(
