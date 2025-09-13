@@ -8,9 +8,11 @@ import MainPanel from './MainPanel';
 import RightDrawer from './RightDrawer';
 import QAModal from './QAModal';
 import type { TreeNode, BreadcrumbItem } from './types';
+import { useAnimation } from '../../hooks/use-animation';
 
 // Define types directly in the component for now
 export interface QAPair {
+  _id: string;
   question: string;
   answer: string;
   created_at: string;
@@ -88,6 +90,13 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
   }, [clusterData]);
 
   // Filter clusters and QAs based on search
+  const allItems = useMemo(() => {
+    if (!clusterData) return [];
+    return clusterData.clusters.flatMap(cluster => cluster.qas);
+  }, [clusterData]);
+
+  const { animatedItems, scrollToItemId } = useAnimation(allItems, [allItems]);
+
   const filteredClusters = useMemo(() => {
     if (!clusterData) return [];
     const q = searchQuery.trim().toLowerCase();
@@ -118,6 +127,28 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       }
     }
   }, [selectedNodeId]);
+
+  // Effect for scrolling to a new or updated card
+  useEffect(() => {
+    if (scrollToItemId && clusterData) {
+      const targetCluster = clusterData.clusters.find(c => c.qas.some(qa => qa._id === scrollToItemId));
+      if (!targetCluster) return;
+
+      const clusterElement = document.getElementById(`cluster-${targetCluster.title}`);
+      const cardElement = document.getElementById(`qa-card-${scrollToItemId}`);
+
+      if (clusterElement && cardElement) {
+        clusterElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+        const columnScrollContainer = clusterElement.querySelector('.custom-scrollbar');
+        if (columnScrollContainer) {
+          setTimeout(() => {
+            cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 500); 
+        }
+      }
+    }
+  }, [scrollToItemId, clusterData]);
 
   // Function to update the custom scrollbar's size and position
   const updateScrollbar = () => {
@@ -298,6 +329,37 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
           .animate-pulse-live {
             animation: pulse-live 2s infinite;
           }
+
+          @keyframes card-new-animation {
+            0% {
+              opacity: 0;
+              transform: translateY(10px);
+              box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+            50% {
+              opacity: 1;
+              box-shadow: 0 0 15px 3px rgba(59, 130, 246, 0.4);
+            }
+            100% {
+              transform: translateY(0);
+              box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+          }
+          .animate-card-new {
+            animation: card-new-animation 1.5s ease-out;
+          }
+
+          @keyframes card-updated-animation {
+            0%, 100% {
+              background-color: var(--tw-bg-opacity, 1) 0.05;
+            }
+            50% {
+              background-color: #3f3f46; 
+            }
+          }
+          .animate-card-updated {
+            animation: card-updated-animation 1.5s ease-out;
+          }
         `}
       </style>
 
@@ -342,6 +404,7 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
                   onOpenQAModal={openQAModal}
                   isAnimated={animatedNodeId === cluster.title}
                   columnIndex={index}
+                  animatedItems={animatedItems}
                 />
               ))}
               <div className="flex-shrink-0 w-px" />

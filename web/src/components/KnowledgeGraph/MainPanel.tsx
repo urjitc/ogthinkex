@@ -1,6 +1,6 @@
 import React from 'react';
 import QACard from './QACard';
-import type { QAPair } from './KnowledgeGraph';
+import type { QAPair } from './KnowledgeGraphWithWebSocket';
 
 interface MainPanelProps {
   viewMode: 'list' | 'graph';
