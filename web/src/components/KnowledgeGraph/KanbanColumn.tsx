@@ -9,6 +9,8 @@ interface KanbanColumnProps {
   isAnimated: boolean;
   columnIndex: number;
   animatedItems: { [key: string]: string };
+  itemsToDelete: Set<string>;
+  onToggleItemForDeletion: (qaId: string) => void;
 }
 
 // Global array to track used colors for adjacent column checking
@@ -67,7 +69,7 @@ const getStatusColor = (title: string, columnIndex: number) => {
   return colors[colorIndex];
 };
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, onOpenQAModal, isAnimated, columnIndex, animatedItems }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, onOpenQAModal, isAnimated, columnIndex, animatedItems, itemsToDelete, onToggleItemForDeletion }) => {
   const statusColors = useMemo(() => getStatusColor(cluster.title, columnIndex), [cluster.title, columnIndex]);
   
   return (
@@ -122,6 +124,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, 
               onOpenDetail={() => onOpenCardDetail(qa.question)}
               onOpenModal={() => onOpenQAModal(qa)}
               animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}
+              isSelectedForDeletion={itemsToDelete.has(qa._id)}
+              onToggleSelection={() => onToggleItemForDeletion(qa._id)}
             />
           ))}
         </div>

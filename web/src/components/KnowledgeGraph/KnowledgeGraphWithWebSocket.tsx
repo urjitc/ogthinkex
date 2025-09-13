@@ -9,6 +9,7 @@ import RightDrawer from './RightDrawer';
 import QAModal from './QAModal';
 import type { TreeNode, BreadcrumbItem } from './types';
 import { useAnimation } from '../../hooks/use-animation';
+import ContextToolbar from './ContextToolbar';
 
 // Define types directly in the component for now
 export interface QAPair {
@@ -54,6 +55,8 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
+  const [itemsToDelete, setItemsToDelete] = useState<Set<string>>(new Set());
+  const [contextDrawerOpen, setContextDrawerOpen] = useState<boolean>(false);
 
   // Use React Query to fetch data
   const { data: clusterData, isLoading, error } = useQuery({
@@ -273,6 +276,46 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
     setSelectedQAItem(null);
   };
 
+  const handleDelete = async () => {
+    if (itemsToDelete.size === 0) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${itemsToDelete.size} item(s)? This action cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    // For now, we only support deleting single QAs. Cluster deletion can be added later.
+    const promises = Array.from(itemsToDelete).map(itemId => {
+      // Find the cluster name for the given qa_id
+      const cluster = clusterData?.clusters.find(c => c.qas.some(q => q._id === itemId));
+      if (!cluster) return Promise.resolve();
+
+      return fetch('https://thinkex.onrender.com/delete_item', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clusterName: cluster.title, qa_id: itemId }),
+      });
+    });
+
+    await Promise.all(promises);
+    setItemsToDelete(new Set()); // Clear selection after deletion
+  };
+
+  const toggleItemForDeletion = (qaId: string) => {
+    setItemsToDelete(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(qaId)) {
+        newSet.delete(qaId);
+      } else {
+        newSet.add(qaId);
+      }
+      return newSet;
+    });
+  };
+
   const selectedCard = useMemo(() => {
     if (!selectedCardId || !clusterData) return null;
     for (const cluster of clusterData.clusters) {
@@ -412,6 +455,8 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
                   isAnimated={animatedNodeId === cluster.title}
                   columnIndex={index}
                   animatedItems={animatedItems}
+                  itemsToDelete={itemsToDelete}
+                  onToggleItemForDeletion={toggleItemForDeletion}
                 />
               ))}
               <div className="flex-shrink-0 w-px" />
@@ -444,6 +489,12 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
         isOpen={modalOpen}
         qaItem={selectedQAItem}
         onClose={closeQAModal}
+      />
+
+      <ContextToolbar 
+        onToggleDrawer={() => setContextDrawerOpen(!contextDrawerOpen)}
+        onDelete={handleDelete}
+        contextItemCount={itemsToDelete.size}
       />
     </div>
   );
