@@ -41,10 +41,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-origins = ["http://localhost:4321", "null", "http://localhost:5173", "http://127.0.0.1:5173", "https://thinkex.netlify.app"]
+# Allow all origins for development, or be more specific in production
+# For example, to allow all netlify subdomains and localhost:
+origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=origins_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
