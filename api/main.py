@@ -83,17 +83,18 @@ lock = Lock()
 # Ably connection management
 class AblyManager:
     def __init__(self):
+        self.ably_api_key = os.getenv('ABLY_API_KEY')
+        self.ably_rest = AblyRest(self.ably_api_key) if self.ably_api_key else None
         self.ably_realtime = None
         self.channel = None
-        self.ably_api_key = os.getenv('ABLY_API_KEY')
         self._connection_event = None
 
-    async def initialize(self):
-        """Initialize Ably connection using async with pattern"""
+    async def initialize_realtime(self):
+        """Initialize Ably Realtime connection using async with pattern"""
         if not self.ably_api_key:
-            print("ABLY_API_KEY not found in environment variables")
+            print("ABLY_API_KEY not found, cannot initialize Ably Realtime.")
             return False
-        
+
         try:
             # Initialize the Ably Realtime client using async with
             async with AblyRealtime(self.ably_api_key, client_id="thinkex-backend-server") as ably_realtime:
@@ -102,18 +103,14 @@ class AblyManager:
                 # Set up connection state listener
                 def on_state_change(state_change):
                     if state_change.current.value == "connected":
-                        print("Made my first connection!")
+                        print("Ably Realtime connected!")
                     elif state_change.current.value == "failed":
-                        print(f"Ably connection failed: {state_change.reason}")
+                        print(f"Ably Realtime connection failed: {state_change.reason}")
                     else:
-                        print(f"Ably connection state: {state_change.current.value}")
+                        print(f"Ably Realtime connection state: {state_change.current.value}")
                 
                 ably_realtime.connection.on(on_state_change)
-                
-                # Wait for connection to be established
                 await ably_realtime.connection.once_async("connected")
-                
-                # Get the channel after successful connection
                 self.channel = ably_realtime.channels.get('knowledge-graph-updates')
                 print("Ably channel ready for broadcasting")
                 
@@ -122,7 +119,7 @@ class AblyManager:
                 await self._connection_event.wait()
                 
         except Exception as e:
-            print(f"Failed to initialize Ably client: {e}")
+            print(f"Failed to initialize Ably Realtime client: {e}")
             return False
         
         return True
@@ -152,22 +149,26 @@ ably_task = None
 # FastAPI lifecycle events
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Ably connection on startup using async with pattern"""
+    """Initialize Ably clients on startup"""
     global manager, ably_task
     print("Starting up FastAPI application...")
     
     manager = AblyManager()
-    
-    # Start Ably connection as a background task
-    ably_task = asyncio.create_task(manager.initialize())
+    if manager.ably_rest:
+        print("Ably REST client initialized for token requests.")
+    else:
+        print("ABLY_API_KEY not found. Ably REST client not initialized.")
+
+    # Start Ably Realtime connection as a background task
+    ably_task = asyncio.create_task(manager.initialize_realtime())
     
     # Give it a moment to establish connection
-    await asyncio.sleep(1)
+    await asyncio.sleep(2) # Increased sleep to allow for connection
     
     if manager.channel:
-        print("Ably connection ready for real-time updates")
+        print("Ably Realtime connection ready for broadcasting.")
     else:
-        print("Ably connection not available - running without real-time updates")
+        print("Ably Realtime connection not available.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -364,32 +365,18 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
     """
     print("=== ABLY TOKEN REQUEST START ===")
     print(f"Received clientId parameter: {clientId}")
-    
-    # Check environment variable
-    ably_api_key = os.getenv('ABLY_API_KEY')
-    print(f"ABLY_API_KEY exists: {ably_api_key is not None}")
-    if ably_api_key:
-        print(f"ABLY_API_KEY length: {len(ably_api_key)}")
-        print(f"ABLY_API_KEY starts with: {ably_api_key[:10]}...")
-    
-    if not ably_api_key:
-        print("ERROR: ABLY_API_KEY not found in environment variables")
-        print(f"Available env vars: {list(os.environ.keys())}")
+
+    if not manager or not manager.ably_rest:
         raise HTTPException(
             status_code=500, 
-            detail="Missing ABLY_API_KEY environment variable"
+            detail="Ably REST client not initialized. Check ABLY_API_KEY."
         )
-    
+
     # Generate client ID
     client_id = clientId or f"thinkex-client-{datetime.utcnow().timestamp()}"
     print(f"Using client_id: {client_id}")
     
     try:
-        print("Creating Ably REST client...")
-        ably_rest = AblyRest(ably_api_key)
-        print("Ably REST client created successfully")
-        
-        print("Calling create_token_request...")
         # Create token request with proper parameters as per Ably docs
         token_request_params = {
             'clientId': client_id,
@@ -397,8 +384,9 @@ async def ably_token_request(clientId: Optional[str] = Query(None)):
             'ttl': 3600 * 1000  # 1 hour in milliseconds
         }
         
-        # Create and return the token request. Ably SDKs expect a dictionary.
-        token_request = ably_rest.auth.create_token_request(token_request_params)
+        print("Calling create_token_request using shared client...")
+        # Use the shared AblyRest client from the manager
+        token_request = await manager.ably_rest.auth.create_token_request(token_request_params)
         print(f"Token request created successfully: {token_request}")
         print("=== ABLY TOKEN REQUEST SUCCESS ===")
         return token_request
