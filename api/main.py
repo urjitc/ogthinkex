@@ -90,160 +90,161 @@ manager = ConnectionManager()
 # Mock data per your spec:
 # - One ClusterList titled "calculus"
 # - Clusters are integration topics
-DATA = ClusterList(
-    title="Calculus",
-    clusters=[
-        Cluster(
-            title="Substitution",
-            qas=[
-                QAPair(
-                    question="How do I recognize when to use u-substitution?",
-                    answer="Look for a composite f(g(x)) where g'(x) appears elsewhere (up to a constant factor)."
-                ),
-                QAPair(
-                    question="What if the derivative isn’t an exact match?",
-                    answer="Factor out constants or rewrite the integrand; if only a constant is missing, multiply/divide by it."
-                ),
-                QAPair(
-                    question="Common patterns for substitution?",
-                    answer="Roots like √(ax+b), exponentials e^{ax+b}, logarithms ln(ax+b), and products f(g(x))·g'(x)."
-                )
-            ]
-        ),
-        Cluster(
-            title="Integration by Parts",
-            qas=[
-                QAPair(
-                    question="What is the integration by parts formula?",
-                    answer="∫u dv = uv − ∫v du; pick u via LIATE/ILATE when unsure."
-                ),
-                QAPair(
-                    question="When does tabular (DI) method help?",
-                    answer="When u differentiates to 0 in a few steps (polynomials) and dv integrates repeatedly (e^x, sin, cos)."
-                ),
-                QAPair(
-                    question="Classic targets for choosing u?",
-                    answer="ln x, arctan x, algebraic factors with exponent ≥ 1."
-                ),
-                QAPair(
-                    question="What about ∫e^{ax}cos(bx) dx?",
-                    answer="Apply IBP twice or use the standard result: ∫e^{ax}cos(bx)dx = e^{ax}(a cos bx + b sin bx)/(a^2+b^2)+C."
-                )
-            ]
-        ),
-        Cluster(
-            title="Partial Fractions",
-            qas=[
-                QAPair(
-                    question="When can I use partial fractions?",
-                    answer="For rational functions P/Q with deg P < deg Q and Q factorable over ℝ; do long division if deg P ≥ deg Q."
-                ),
-                QAPair(
-                    question="How do I handle repeated linear factors?",
-                    answer="Include terms A1/(x−r) + A2/(x−r)^2 + … up to the multiplicity."
-                ),
-                QAPair(
-                    question="What about irreducible quadratics?",
-                    answer="Use (Ax+B)/(ax^2+bx+c) for each irreducible quadratic factor."
-                )
-            ]
-        ),
-        Cluster(
-            title="Trigonometric Integrals",
-            qas=[
-                QAPair(
-                    question="How to approach ∫sin^m x cos^n x dx?",
-                    answer="If one exponent is odd, peel one factor and use sin^2+cos^2=1 to convert the rest."
-                ),
-                QAPair(
-                    question="Strategy for ∫tan^m x sec^n x dx?",
-                    answer="If n is even, peel sec^2; if m is odd, peel sec·tan and convert using sec^2=1+tan^2."
-                ),
-                QAPair(
-                    question="Power-reduction identities useful when?",
-                    answer="When both exponents are even; convert with cos^2=(1+cos2x)/2, sin^2=(1−cos2x)/2."
-                )
-            ]
-        ),
-        Cluster(
-            title="Trigonometric Substitution",
-            qas=[
-                QAPair(
-                    question="Which substitution for √(a^2 − x^2)?",
-                    answer="x = a sin θ, dx = a cos θ dθ, and use 1−sin^2θ=cos^2θ."
-                ),
-                QAPair(
-                    question="Which substitution for √(a^2 + x^2)?",
-                    answer="x = a tan θ, dx = a sec^2 θ dθ, and 1+tan^2θ=sec^2θ."
-                ),
-                QAPair(
-                    question="Which substitution for √(x^2 − a^2)?",
-                    answer="x = a sec θ, dx = a sec θ tan θ dθ, and sec^2θ−1=tan^2θ."
-                ),
-                QAPair(
-                    question="How do I back-substitute cleanly?",
-                    answer="Draw a reference triangle from the substitution to express sinθ, cosθ, tanθ in terms of x and a."
-                )
-            ]
-        ),
-        Cluster(
-            title="Improper Integrals",
-            qas=[
-                QAPair(
-                    question="How do I test convergence of ∫_1^∞ 1/x^p dx?",
-                    answer="Converges iff p>1; diverges otherwise (p-test)."
-                ),
-                QAPair(
-                    question="What about ∫_0^1 x^{−p} dx?",
-                    answer="Converges iff p<1; diverges otherwise."
-                ),
-                QAPair(
-                    question="When to use comparison vs limit comparison?",
-                    answer="Use direct comparison with clear inequalities; use limit comparison when functions are asymptotically proportional."
-                )
-            ]
-        ),
-        Cluster(
-            title="Reduction Formulas",
-            qas=[
-                QAPair(
-                    question="What is a reduction formula?",
-                    answer="A recurrence expressing ∫f_n in terms of ∫f_{n−1} (e.g., ∫sin^n x dx)."
-                ),
-                QAPair(
-                    question="Example for sin^n x?",
-                    answer="∫sin^n x dx = −(sin^{n−1}x cos x)/n + ((n−1)/n)∫sin^{n−2}x dx."
-                )
-            ]
-        ),
-        Cluster(
-            title="Numerical Integration",
-            qas=[
-                QAPair(
-                    question="When to use Trapezoidal vs Simpson’s?",
-                    answer="Trapezoidal is O(h^2) and simple; Simpson’s is O(h^4) but needs an even number of subintervals and smooth f."
-                ),
-                QAPair(
-                    question="How to control error quickly?",
-                    answer="Halve h and compare results; Richardson extrapolation can accelerate convergence."
-                )
-            ]
-        ),
-        Cluster(
-            title="Integration Strategy",
-            qas=[
-                QAPair(
-                    question="What’s a good general checklist?",
-                    answer="Simplify → try substitution → trig identities → parts → partial fractions → trig sub → numeric if needed."
-                ),
-                QAPair(
-                    question="Quick algebraic rewrites that help?",
-                    answer="Split sums, factor constants, complete the square, rationalize, or rewrite powers with identities."
-                )
-            ]
-        )
-    ]
-)
+# DATA = ClusterList(
+#     title="Calculus",
+#     clusters=[
+#         Cluster(
+#             title="Substitution",
+#             qas=[
+#                 QAPair(
+#                     question="How do I recognize when to use u-substitution?",
+#                     answer="Look for a composite f(g(x)) where g'(x) appears elsewhere (up to a constant factor)."
+#                 ),
+#                 QAPair(
+#                     question="What if the derivative isn’t an exact match?",
+#                     answer="Factor out constants or rewrite the integrand; if only a constant is missing, multiply/divide by it."
+#                 ),
+#                 QAPair(
+#                     question="Common patterns for substitution?",
+#                     answer="Roots like √(ax+b), exponentials e^{ax+b}, logarithms ln(ax+b), and products f(g(x))·g'(x)."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Integration by Parts",
+#             qas=[
+#                 QAPair(
+#                     question="What is the integration by parts formula?",
+#                     answer="∫u dv = uv − ∫v du; pick u via LIATE/ILATE when unsure."
+#                 ),
+#                 QAPair(
+#                     question="When does tabular (DI) method help?",
+#                     answer="When u differentiates to 0 in a few steps (polynomials) and dv integrates repeatedly (e^x, sin, cos)."
+#                 ),
+#                 QAPair(
+#                     question="Classic targets for choosing u?",
+#                     answer="ln x, arctan x, algebraic factors with exponent ≥ 1."
+#                 ),
+#                 QAPair(
+#                     question="What about ∫e^{ax}cos(bx) dx?",
+#                     answer="Apply IBP twice or use the standard result: ∫e^{ax}cos(bx)dx = e^{ax}(a cos bx + b sin bx)/(a^2+b^2)+C."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Partial Fractions",
+#             qas=[
+#                 QAPair(
+#                     question="When can I use partial fractions?",
+#                     answer="For rational functions P/Q with deg P < deg Q and Q factorable over ℝ; do long division if deg P ≥ deg Q."
+#                 ),
+#                 QAPair(
+#                     question="How do I handle repeated linear factors?",
+#                     answer="Include terms A1/(x−r) + A2/(x−r)^2 + … up to the multiplicity."
+#                 ),
+#                 QAPair(
+#                     question="What about irreducible quadratics?",
+#                     answer="Use (Ax+B)/(ax^2+bx+c) for each irreducible quadratic factor."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Trigonometric Integrals",
+#             qas=[
+#                 QAPair(
+#                     question="How to approach ∫sin^m x cos^n x dx?",
+#                     answer="If one exponent is odd, peel one factor and use sin^2+cos^2=1 to convert the rest."
+#                 ),
+#                 QAPair(
+#                     question="Strategy for ∫tan^m x sec^n x dx?",
+#                     answer="If n is even, peel sec^2; if m is odd, peel sec·tan and convert using sec^2=1+tan^2."
+#                 ),
+#                 QAPair(
+#                     question="Power-reduction identities useful when?",
+#                     answer="When both exponents are even; convert with cos^2=(1+cos2x)/2, sin^2=(1−cos2x)/2."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Trigonometric Substitution",
+#             qas=[
+#                 QAPair(
+#                     question="Which substitution for √(a^2 − x^2)?",
+#                     answer="x = a sin θ, dx = a cos θ dθ, and use 1−sin^2θ=cos^2θ."
+#                 ),
+#                 QAPair(
+#                     question="Which substitution for √(a^2 + x^2)?",
+#                     answer="x = a tan θ, dx = a sec^2 θ dθ, and 1+tan^2θ=sec^2θ."
+#                 ),
+#                 QAPair(
+#                     question="Which substitution for √(x^2 − a^2)?",
+#                     answer="x = a sec θ, dx = a sec θ tan θ dθ, and sec^2θ−1=tan^2θ."
+#                 ),
+#                 QAPair(
+#                     question="How do I back-substitute cleanly?",
+#                     answer="Draw a reference triangle from the substitution to express sinθ, cosθ, tanθ in terms of x and a."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Improper Integrals",
+#             qas=[
+#                 QAPair(
+#                     question="How do I test convergence of ∫_1^∞ 1/x^p dx?",
+#                     answer="Converges iff p>1; diverges otherwise (p-test)."
+#                 ),
+#                 QAPair(
+#                     question="What about ∫_0^1 x^{−p} dx?",
+#                     answer="Converges iff p<1; diverges otherwise."
+#                 ),
+#                 QAPair(
+#                     question="When to use comparison vs limit comparison?",
+#                     answer="Use direct comparison with clear inequalities; use limit comparison when functions are asymptotically proportional."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Reduction Formulas",
+#             qas=[
+#                 QAPair(
+#                     question="What is a reduction formula?",
+#                     answer="A recurrence expressing ∫f_n in terms of ∫f_{n−1} (e.g., ∫sin^n x dx)."
+#                 ),
+#                 QAPair(
+#                     question="Example for sin^n x?",
+#                     answer="∫sin^n x dx = −(sin^{n−1}x cos x)/n + ((n−1)/n)∫sin^{n−2}x dx."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Numerical Integration",
+#             qas=[
+#                 QAPair(
+#                     question="When to use Trapezoidal vs Simpson’s?",
+#                     answer="Trapezoidal is O(h^2) and simple; Simpson’s is O(h^4) but needs an even number of subintervals and smooth f."
+#                 ),
+#                 QAPair(
+#                     question="How to control error quickly?",
+#                     answer="Halve h and compare results; Richardson extrapolation can accelerate convergence."
+#                 )
+#             ]
+#         ),
+#         Cluster(
+#             title="Integration Strategy",
+#             qas=[
+#                 QAPair(
+#                     question="What’s a good general checklist?",
+#                     answer="Simplify → try substitution → trig identities → parts → partial fractions → trig sub → numeric if needed."
+#                 ),
+#                 QAPair(
+#                     question="Quick algebraic rewrites that help?",
+#                     answer="Split sums, factor constants, complete the square, rationalize, or rewrite powers with identities."
+#                 )
+#             ]
+#         )
+#     ]
+# )
+DATA = ClusterList(title="Knowledge Base", clusters=[])
 
 def _find_cluster_idx_case_insensitive(name: str) -> Optional[int]:
     name_norm = name.strip().lower()

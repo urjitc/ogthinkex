@@ -3,6 +3,7 @@
 import React, { memo, useState, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from 'remark-breaks';
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CheckIcon, CopyIcon } from "lucide-react";
@@ -148,7 +149,7 @@ const MarkdownTextImpl: React.FC<MarkdownTextProps> = ({ content }) => {
   return (
     <div className="aui-md">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
         rehypePlugins={[rehypeKatex]}
         components={components}
       >
