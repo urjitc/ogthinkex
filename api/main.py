@@ -78,22 +78,47 @@ class AblyManager:
     def __init__(self):
         self.ably_client = None
         self.channel = None
-        self._initialize_ably()
+        self.ably_api_key = os.getenv('ABLY_API_KEY')
+        self._connection_event = None
 
-    def _initialize_ably(self):
-        """Initialize Ably Realtime client with API key from environment"""
-        ably_api_key = os.getenv('ABLY_API_KEY')
-        if ably_api_key:
-            try:
-                self.ably_client = AblyRealtime(ably_api_key, client_id="thinkex-backend-server")
-                self.channel = self.ably_client.channels.get('knowledge-graph-updates')
-                print("Ably Realtime client initialized successfully")
-            except Exception as e:
-                print(f"Failed to initialize Ably client: {e}")
-                self.ably_client = None
-                self.channel = None
-        else:
+    async def __aenter__(self):
+        """Async context manager entry - initialize Ably connection"""
+        if not self.ably_api_key:
             print("ABLY_API_KEY not found in environment variables")
+            return self
+        
+        try:
+            # Initialize the Ably Realtime client with async context
+            self.ably_client = AblyRealtime(self.ably_api_key, client_id="thinkex-backend-server")
+            
+            # Set up connection state listener
+            def on_state_change(state_change):
+                if state_change.current.value == "connected":
+                    print("Ably Realtime client connected successfully!")
+                elif state_change.current.value == "failed":
+                    print(f"Ably connection failed: {state_change.reason}")
+                else:
+                    print(f"Ably connection state: {state_change.current.value}")
+            
+            self.ably_client.connection.on(on_state_change)
+            
+            # Wait for connection to be established
+            await self.ably_client.connection.once_async("connected")
+            
+            # Get the channel after successful connection
+            self.channel = self.ably_client.channels.get('knowledge-graph-updates')
+            print("Ably channel ready for broadcasting")
+            
+        except Exception as e:
+            print(f"Failed to initialize Ably client: {e}")
+            self.ably_client = None
+            self.channel = None
+        
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit - clean up Ably connection"""
+        await self.close()
 
     async def broadcast(self, message: dict):
         """Broadcast message to all connected clients via Ably"""
@@ -110,24 +135,43 @@ class AblyManager:
     async def close(self):
         """Close the Ably connection"""
         if self.ably_client:
-            await self.ably_client.close()
+            try:
+                await self.ably_client.close()
+                print("Ably connection closed successfully")
+            except Exception as e:
+                print(f"Error closing Ably connection: {e}")
+            finally:
+                self.ably_client = None
+                self.channel = None
 
-manager = AblyManager()
+# Global manager instance
+manager = None
 
 # FastAPI lifecycle events
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Ably connection on startup"""
+    """Initialize Ably connection on startup using async context manager"""
+    global manager
     print("Starting up FastAPI application...")
+    
+    manager = AblyManager()
+    # Initialize the connection using the async context manager pattern
+    await manager.__aenter__()
+    
     if manager.ably_client:
         print("Ably connection ready for real-time updates")
+    else:
+        print("Ably connection not available - running without real-time updates")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up Ably connection on shutdown"""
+    global manager
     print("Shutting down FastAPI application...")
-    await manager.close()
-    print("Ably connection closed")
+    
+    if manager:
+        await manager.__aexit__(None, None, None)
+        print("Ably connection cleanup completed")
 
 # Mock data per your spec:
 # - One ClusterList titled "calculus"
