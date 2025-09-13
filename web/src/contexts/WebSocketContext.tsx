@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Ably from "ably";
-import { AblyProvider as AblyReactProvider, useAbly as useAblyHook, useChannel, useConnectionStateListener } from 'ably/react';
+import { AblyProvider as AblyReactProvider, ChannelProvider, useAbly as useAblyHook, useChannel, useConnectionStateListener } from 'ably/react';
 
 // Create Ably client with token authentication
 const createAblyClient = () => {
@@ -96,9 +96,11 @@ export function AblyProvider({ children }: { children: ReactNode }) {
 
   return (
     <AblyReactProvider client={ablyClient}>
-      <AblyRealtimeHandler>
-        {children}
-      </AblyRealtimeHandler>
+      <ChannelProvider channelName="knowledge-graph-updates">
+        <AblyRealtimeHandler>
+          {children}
+        </AblyRealtimeHandler>
+      </ChannelProvider>
     </AblyReactProvider>
   );
 }
