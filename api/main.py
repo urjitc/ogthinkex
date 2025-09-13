@@ -1,12 +1,14 @@
 # main.py
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Set
+from typing import List, Optional
 from uuid import uuid4, UUID
 from threading import Lock
 from datetime import datetime
 import json
+import os
+from ably import AblyRest
 
 # -----------------------------
 # 1) Data Models (Pydantic)
@@ -55,7 +57,7 @@ app = FastAPI(
 
 # Allow all origins for development, or be more specific in production
 # For example, to allow all netlify subdomains and localhost:
-origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app|https://uninveighing-eve-flinchingly.ngrok-free.app"
+origins_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*--thinkex\.netlify\.app|https://thinkex\.netlify\.app|https://uninveighing-eve-flinchingly.ngrok-free.app|https://thinkex.onrender.com"
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,41 +68,45 @@ app.add_middleware(
 )
 
 # -----------------------------
-# 3) In-Memory Store (thread-safe) + WebSocket Management
+# 3) In-Memory Store (thread-safe) + Ably Management
 # -----------------------------
 lock = Lock()
 
-# WebSocket connection management
-class ConnectionManager:
+# Ably connection management
+class AblyManager:
     def __init__(self):
-        self.active_connections: Set[WebSocket] = set()
+        self.ably_client = None
+        self.channel = None
+        self._initialize_ably()
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.add(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.discard(websocket)
+    def _initialize_ably(self):
+        """Initialize Ably client with API key from environment"""
+        ably_api_key = os.getenv('ABLY_API_KEY')
+        if ably_api_key:
+            try:
+                self.ably_client = AblyRest(ably_api_key)
+                self.channel = self.ably_client.channels.get('knowledge-graph-updates')
+                print("Ably client initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize Ably client: {e}")
+                self.ably_client = None
+                self.channel = None
+        else:
+            print("ABLY_API_KEY not found in environment variables")
 
     async def broadcast(self, message: dict):
-        """Broadcast message to all connected clients"""
-        if not self.active_connections:
+        """Broadcast message to all connected clients via Ably"""
+        if not self.channel:
+            print("Ably channel not available, skipping broadcast")
             return
         
-        message_str = json.dumps(message)
-        disconnected = set()
-        
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(message_str)
-            except Exception:
-                disconnected.add(connection)
-        
-        # Remove disconnected clients
-        for connection in disconnected:
-            self.active_connections.discard(connection)
+        try:
+            self.channel.publish('server-update', message)
+            print(f"Message broadcasted via Ably: {message.get('type', 'unknown')}")
+        except Exception as e:
+            print(f"Failed to broadcast message via Ably: {e}")
 
-manager = ConnectionManager()
+manager = AblyManager()
 
 # Mock data per your spec:
 # - One ClusterList titled "calculus"
@@ -405,25 +411,7 @@ async def add_qa(payload: AddQARequest):
                 cluster=DATA.clusters[idx]
             )
 
-# -----------------------------
-# 4) WebSocket Endpoint
-# -----------------------------
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Keep the connection alive and listen for messages
-            data = await websocket.receive_text()
-            # Echo back or handle client messages if needed
-            message = json.loads(data)
-            if message.get("type") == "ping":
-                await websocket.send_text(json.dumps({"type": "pong"}))
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-        manager.disconnect(websocket)
+# WebSocket endpoint removed - now using Ably for real-time communication
 
 # -----------------------------
 # 5) Health + Root (optional)

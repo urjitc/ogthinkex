@@ -59,7 +59,6 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
   const { data: clusterData, isLoading, error } = useQuery({
     queryKey: ['knowledgeGraph'],
     queryFn: fetchClusters,
-    refetchInterval: isConnected ? false : 30000, // Only poll if WebSocket is not connected
   });
 
   // The new sidebar structure will be a simple list of clusters
