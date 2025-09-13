@@ -24,13 +24,16 @@ export interface Cluster {
 }
 
 export interface ClusterList {
+  graph_id: string;
   title: string;
   clusters: Cluster[];
 }
 
 // Fetch function for React Query
-const fetchClusters = async (): Promise<ClusterList> => {
-  const response = await fetch('https://thinkex.onrender.com/clusters', {
+const fetchClusters = async (graphId: string | undefined): Promise<ClusterList | null> => {
+  if (!graphId) return null;
+
+  const response = await fetch('https://thinkex.onrender.com/knowledge-graphs', {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
@@ -38,7 +41,9 @@ const fetchClusters = async (): Promise<ClusterList> => {
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
-  return response.json();
+  const allGraphs: ClusterList[] = await response.json();
+  const targetGraph = allGraphs.find(graph => graph.graph_id === graphId);
+  return targetGraph || null;
 };
 
 const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }) => {
@@ -57,13 +62,15 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
 
   // Use React Query to fetch data
   const { data: clusterData, isLoading, error } = useQuery({
-    queryKey: ['knowledgeGraph'],
-    queryFn: fetchClusters,
+    queryKey: ['knowledgeGraph', graphId],
+    queryFn: () => fetchClusters(graphId),
+    enabled: !!graphId, // Only run the query if graphId is available
   });
 
     const deleteClusterMutation = useMutation({
     mutationFn: async (clusterName: string) => {
-      const response = await fetch(`https://thinkex.onrender.com/cluster/${encodeURIComponent(clusterName)}`, {
+      if (!graphId) throw new Error("No graph ID provided for deletion.");
+      const response = await fetch(`https://thinkex.onrender.com/knowledge-graphs/${graphId}/cluster/${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -72,13 +79,14 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph', graphId] });
     },
   });
 
   const deleteQAMutation = useMutation({
     mutationFn: async ({ qaId, clusterName }: { qaId: string; clusterName: string }) => {
-      const response = await fetch(`https://thinkex.onrender.com/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
+      if (!graphId) throw new Error("No graph ID provided for deletion.");
+      const response = await fetch(`https://thinkex.onrender.com/knowledge-graphs/${graphId}/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -87,7 +95,7 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph', graphId] });
     },
   });
 
