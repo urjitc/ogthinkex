@@ -12,7 +12,7 @@ import json
 # 1) Data Models (Pydantic)
 # -----------------------------
 class QAPair(BaseModel):
-    qa_id: str = Field(default_factory=lambda: str(uuid4()))
+    qa_id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
     question: str
     answer: str
     created_at: Optional[str] = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")

@@ -8,6 +8,7 @@ interface KanbanColumnProps {
   onOpenQAModal: (qaItem: QAPair) => void;
   isAnimated: boolean;
   columnIndex: number;
+  animatedItems: { [key: string]: string };
 }
 
 // Global array to track used colors for adjacent column checking
@@ -66,7 +67,7 @@ const getStatusColor = (title: string, columnIndex: number) => {
   return colors[colorIndex];
 };
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, onOpenQAModal, isAnimated, columnIndex }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, onOpenQAModal, isAnimated, columnIndex, animatedItems }) => {
   const statusColors = useMemo(() => getStatusColor(cluster.title, columnIndex), [cluster.title, columnIndex]);
   
   return (
@@ -116,10 +117,11 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenCardDetail, 
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
           {cluster.qas.map(qa => (
             <QACard 
-              key={qa.question} 
+              key={qa._id} 
               item={qa} 
               onOpenDetail={() => onOpenCardDetail(qa.question)}
               onOpenModal={() => onOpenQAModal(qa)}
+              animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}
             />
           ))}
         </div>

@@ -1,16 +1,34 @@
-import React, { useState } from 'react';
-import type { QAPair } from './KnowledgeGraph'; // Import the new type
+import React, { useState, useEffect } from 'react';
+import type { QAPair } from './KnowledgeGraphWithWebSocket';
 
 interface QACardProps {
   item: QAPair;
   onOpenDetail: () => void;
   onOpenModal: () => void;
+  animationState?: 'new' | 'updated';
 }
 
-const QACard: React.FC<QACardProps> = ({ item, onOpenDetail, onOpenModal }) => {
+const QACard: React.FC<QACardProps> = ({ item, onOpenDetail, onOpenModal, animationState }) => {
+  const [animationClass, setAnimationClass] = useState('');
+
+  useEffect(() => {
+    if (animationState === 'new') {
+      setAnimationClass('animate-card-new');
+    } else if (animationState === 'updated') {
+      setAnimationClass('animate-card-updated');
+    }
+
+    if (animationState) {
+      const timer = setTimeout(() => {
+        setAnimationClass('');
+      }, 1500); // Match animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [animationState]);
   return (
     <div 
-      className="bg-zinc-950/50 rounded-lg border border-zinc-800 shadow-sm hover:shadow-lg hover:border-zinc-700 transition-all duration-200 cursor-pointer group"
+      id={`qa-card-${item._id}`}
+      className={`bg-zinc-950/50 rounded-lg border border-zinc-800 shadow-sm hover:shadow-lg hover:border-zinc-700 transition-all duration-200 cursor-pointer group ${animationClass}`}
       onClick={onOpenModal}
     >
       {/* Header */}
