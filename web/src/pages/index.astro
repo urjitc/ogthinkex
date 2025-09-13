@@ -1,13 +1,12 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import KnowledgeGraphWrapper from '../components/KnowledgeGraphWrapper.astro';
+import ClusterListWrapper from '../components/ClusterListWrapper.astro';
 
-// Use the default graph ID for the main page
-const graphId = "default_graph";
+const graphId = "default"; // The backend will serve the default list
 ---
 
-<Layout title="ThinkEx - Knowledge Base">
-  <main>
-    <KnowledgeGraphWrapper graphId={graphId} />
-  </main>
+<Layout title="ThinkEx - Cluster List">
+	<main>
+		<ClusterListWrapper graphId={graphId} />
+	</main>
 </Layout>

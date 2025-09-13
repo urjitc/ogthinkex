@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { Cluster, QAPair } from './KnowledgeGraphWithWebSocket';
+import type { Cluster, QAPair } from './ClusterListWithWebSocket';
 import QACard from './QACard';
 
 import { useState, useRef, useEffect } from 'react';

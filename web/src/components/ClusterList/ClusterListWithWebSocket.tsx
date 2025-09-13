@@ -24,16 +24,16 @@ export interface Cluster {
 }
 
 export interface ClusterList {
-  graph_id: string;
+  list_id: string;
   title: string;
   clusters: Cluster[];
 }
 
 // Fetch function for React Query
-const fetchClusters = async (graphId: string | undefined): Promise<ClusterList | null> => {
-  if (!graphId) return null;
+const fetchClusterList = async (listId: string | undefined): Promise<ClusterList | null> => {
+  if (!listId) return null;
 
-  const response = await fetch('https://thinkex.onrender.com/knowledge-graphs', {
+  const response = await fetch('https://thinkex.onrender.com/cluster-lists', {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
@@ -41,12 +41,12 @@ const fetchClusters = async (graphId: string | undefined): Promise<ClusterList |
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
-  const allGraphs: ClusterList[] = await response.json();
-  const targetGraph = allGraphs.find(graph => graph.graph_id === graphId);
-  return targetGraph || null;
+  const allLists: ClusterList[] = await response.json();
+  const targetList = allLists.find(list => list.list_id === listId);
+  return targetList || null;
 };
 
-const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }) => {
+const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId }) => {
   const queryClient = useQueryClient();
   const { isConnected } = useWebSocket();
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -62,15 +62,15 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
 
   // Use React Query to fetch data
   const { data: clusterData, isLoading, error } = useQuery({
-    queryKey: ['knowledgeGraph', graphId],
-    queryFn: () => fetchClusters(graphId),
-    enabled: !!graphId, // Only run the query if graphId is available
+    queryKey: ['clusterList', listId],
+    queryFn: () => fetchClusterList(listId),
+    enabled: !!listId, // Only run the query if listId is available
   });
 
     const deleteClusterMutation = useMutation({
     mutationFn: async (clusterName: string) => {
-      if (!graphId) throw new Error("No graph ID provided for deletion.");
-      const response = await fetch(`https://thinkex.onrender.com/knowledge-graphs/${graphId}/cluster/${encodeURIComponent(clusterName)}`, {
+      if (!listId) throw new Error("No list ID provided for deletion.");
+      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${listId}/cluster/${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -79,14 +79,14 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph', graphId] });
+      queryClient.invalidateQueries({ queryKey: ['clusterList', listId] });
     },
   });
 
   const deleteQAMutation = useMutation({
     mutationFn: async ({ qaId, clusterName }: { qaId: string; clusterName: string }) => {
-      if (!graphId) throw new Error("No graph ID provided for deletion.");
-      const response = await fetch(`https://thinkex.onrender.com/knowledge-graphs/${graphId}/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
+      if (!listId) throw new Error("No list ID provided for deletion.");
+      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${listId}/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -95,7 +95,7 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledgeGraph', graphId] });
+      queryClient.invalidateQueries({ queryKey: ['clusterList', listId] });
     },
   });
 
@@ -486,4 +486,4 @@ const KnowledgeGraphWithWebSocket: React.FC<{ graphId?: string }> = ({ graphId }
   );
 };
 
-export default KnowledgeGraphWithWebSocket;
+export default ClusterListWithWebSocket;
