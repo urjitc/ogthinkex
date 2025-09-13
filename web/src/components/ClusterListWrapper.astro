@@ -2,7 +2,7 @@
 // Astro wrapper component for the KnowledgeGraph React component
 // This follows Astro best practices for integrating React components
 
-import KnowledgeGraphWrapper from './KnowledgeGraph/KnowledgeGraphWrapper';
+import ClusterListWrapper from './ClusterList/ClusterListWrapper';
 import LoadingState from './LoadingState.astro';
 
 // Props interface for TypeScript support
@@ -12,10 +12,10 @@ interface Props {
   description?: string;
 }
 
-const { graphId, title = "Knowledge Base", description = "Explore and organize your knowledge with interactive Q&A cards" } = Astro.props;
+const { graphId, title = "Cluster List", description = "Explore and organize your clusters with interactive Q&A cards" } = Astro.props;
 ---
 
-<div class="knowledge-graph-container">
+<div class="cluster-list-container">
   <!-- Loading state that shows before React component hydrates -->
   <div id="loading-state">
     <LoadingState message="Loading knowledge platform..." />
@@ -25,8 +25,8 @@ const { graphId, title = "Knowledge Base", description = "Explore and organize y
     React component with client:load directive for immediate hydration
     This ensures the component is interactive as soon as the page loads
   -->
-  <div id="knowledge-graph-container" style="display: none;">
-    <KnowledgeGraphWrapper graphId={graphId} client:load />
+  <div id="cluster-list-container" style="display: none;">
+    <ClusterListWrapper graphId={graphId} client:load />
   </div>
 </div>
 
@@ -35,20 +35,20 @@ const { graphId, title = "Knowledge Base", description = "Explore and organize y
   // This ensures a smooth transition from loading to interactive state
   document.addEventListener('DOMContentLoaded', () => {
     const loadingState = document.getElementById('loading-state');
-    const knowledgeGraphContainer = document.getElementById('knowledge-graph-container');
+    const clusterListContainer = document.getElementById('cluster-list-container');
     
-    if (loadingState && knowledgeGraphContainer) {
+    if (loadingState && clusterListContainer) {
       // Small delay to ensure React component has started hydrating
       setTimeout(() => {
         loadingState.style.display = 'none';
-        knowledgeGraphContainer.style.display = 'block';
+        clusterListContainer.style.display = 'block';
       }, 100);
     }
   });
 </script>
 
 <style>
-  .knowledge-graph-container {
+  .cluster-list-container {
     min-height: 100vh;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   }
@@ -58,7 +58,7 @@ const { graphId, title = "Knowledge Base", description = "Explore and organize y
     transition: opacity 0.3s ease-out;
   }
   
-  #knowledge-graph-container {
+  #cluster-list-container {
     transition: opacity 0.3s ease-in;
   }
 </style>
