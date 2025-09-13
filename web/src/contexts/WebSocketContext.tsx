@@ -1,6 +1,14 @@
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Ably from "ably";
+import { AblyProvider as AblyReactProvider, useAbly as useAblyHook, useChannel, useConnectionStateListener } from 'ably/react';
+
+// Create Ably client with token authentication
+const createAblyClient = () => {
+  return new Ably.Realtime({ 
+    authUrl: `/.netlify/functions/ably-token-request?clientId=thinkex-client-${Date.now()}` 
+  });
+};
 
 interface AblyContextType {
   connection: Ably.Realtime | null;
@@ -10,132 +18,67 @@ interface AblyContextType {
 
 const AblyContext = createContext<AblyContextType | null>(null);
 
-interface AblyProviderProps {
-  children: ReactNode;
-}
-
-export function AblyProvider({ children }: AblyProviderProps) {
-  const [connection, setConnection] = useState<Ably.Realtime | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+// Component that handles real-time updates using Ably's useChannel hook
+function AblyRealtimeHandler({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
-  const reconnectIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const ably = useAblyHook();
+  const [isConnected, setIsConnected] = useState(false);
 
-  useEffect(() => {
-    let ablyConnection: Ably.Realtime;
+  // Listen for connection state changes
+  useConnectionStateListener((stateChange) => {
+    const connected = stateChange.current === 'connected';
+    setIsConnected(connected);
+    console.log('Ably connection state:', stateChange.current);
+  });
 
-    const initializeAbly = async () => {
-      try {
-        // Create Ably connection using the token request endpoint
-        ablyConnection = new Ably.Realtime({ 
-          authUrl: `/.netlify/functions/ably-token-request?clientId=thinkex-client-${Date.now()}` 
-        });
-        
-        setConnection(ablyConnection);
+  // Subscribe to knowledge graph updates channel
+  const { publish } = useChannel('knowledge-graph-updates', 'server-update', (msg) => {
+    try {
+      console.log('Received Ably message:', msg);
+      const data = msg.data;
 
-        // Listen for connection state changes
-        ablyConnection.connection.on('connected', () => {
-          console.log('Ably connected');
-          setIsConnected(true);
-          if (reconnectIntervalRef.current) {
-            clearInterval(reconnectIntervalRef.current);
-            reconnectIntervalRef.current = null;
-          }
-        });
-
-        ablyConnection.connection.on('disconnected', () => {
-          console.log('Ably disconnected');
-          setIsConnected(false);
-        });
-
-        ablyConnection.connection.on('failed', (error: any) => {
-          console.error('Ably connection failed:', error);
-          setIsConnected(false);
-          
-          // Start reconnection attempts
-          if (!reconnectIntervalRef.current) {
-            console.log('Starting reconnection polling every 5 seconds...');
-            reconnectIntervalRef.current = setInterval(() => {
-              console.log('Attempting to reconnect...');
-              setReconnectAttempt((prev) => prev + 1);
-            }, 5000);
-          }
-        });
-
-        // Get the channel for knowledge graph updates
-        const channel = ablyConnection.channels.get("knowledge-graph-updates");
-        channelRef.current = channel;
-
-        // Subscribe to server updates from the backend
-        await channel.subscribe('server-update', (msg: Ably.Message) => {
-          try {
-            console.log('Received Ably message:', msg);
-            const data = msg.data;
-
-            switch (data.type) {
-              case 'knowledge_graph_update':
-                queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
-                break;
-              case 'node_update':
-                queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
-                  if (!oldData) return oldData;
-                  return {
-                    ...oldData,
-                    nodes: oldData.nodes.map((node: any) =>
-                      node._id === data.payload._id ? { ...node, ...data.payload } : node
-                    ),
-                  };
-                });
-                break;
-              case 'new_node':
-                queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
-                  if (!oldData) return oldData;
-                  return {
-                    ...oldData,
-                    nodes: [...oldData.nodes, data.payload],
-                  };
-                });
-                break;
-              default:
-                console.log('Unknown message type:', data.type);
-            }
-          } catch (error) {
-            console.error('Error processing Ably message:', error);
-          }
-        });
-
-      } catch (error) {
-        console.error('Error initializing Ably:', error);
-        setIsConnected(false);
+      switch (data.type) {
+        case 'knowledge_graph_update':
+          queryClient.invalidateQueries({ queryKey: ['knowledgeGraph'] });
+          break;
+        case 'node_update':
+          queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              nodes: oldData.nodes.map((node: any) =>
+                node._id === data.payload._id ? { ...node, ...data.payload } : node
+              ),
+            };
+          });
+          break;
+        case 'new_node':
+          queryClient.setQueryData(['knowledgeGraph'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              nodes: [...oldData.nodes, data.payload],
+            };
+          });
+          break;
+        default:
+          console.log('Unknown message type:', data.type);
       }
-    };
-
-    initializeAbly();
-
-    return () => {
-      if (reconnectIntervalRef.current) {
-        clearInterval(reconnectIntervalRef.current);
-      }
-      if (channelRef.current) {
-        channelRef.current.unsubscribe();
-      }
-      if (ablyConnection) {
-        ablyConnection.close();
-      }
-    };
-  }, [queryClient, reconnectAttempt]);
+    } catch (error) {
+      console.error('Error processing Ably message:', error);
+    }
+  });
 
   const sendMessage = (message: any) => {
-    if (channelRef.current && isConnected) {
-      channelRef.current.publish("client-message", message);
+    if (isConnected) {
+      publish("client-message", message);
     } else {
       console.warn('Ably is not connected');
     }
   };
 
   const value: AblyContextType = {
-    connection,
+    connection: ably,
     isConnected,
     sendMessage
   };
@@ -144,6 +87,19 @@ export function AblyProvider({ children }: AblyProviderProps) {
     <AblyContext.Provider value={value}>
       {children}
     </AblyContext.Provider>
+  );
+}
+
+// Main provider that wraps the official AblyProvider
+export function AblyProvider({ children }: { children: ReactNode }) {
+  const ablyClient = createAblyClient();
+
+  return (
+    <AblyReactProvider client={ablyClient}>
+      <AblyRealtimeHandler>
+        {children}
+      </AblyRealtimeHandler>
+    </AblyReactProvider>
   );
 }
 
