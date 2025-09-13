@@ -8,7 +8,8 @@ from threading import Lock
 from datetime import datetime
 import json
 import os
-from ably import AblyRest
+import asyncio
+from ably import AblyRealtime
 
 # -----------------------------
 # 1) Data Models (Pydantic)
@@ -80,13 +81,13 @@ class AblyManager:
         self._initialize_ably()
 
     def _initialize_ably(self):
-        """Initialize Ably client with API key from environment"""
+        """Initialize Ably Realtime client with API key from environment"""
         ably_api_key = os.getenv('ABLY_API_KEY')
         if ably_api_key:
             try:
-                self.ably_client = AblyRest(ably_api_key)
+                self.ably_client = AblyRealtime(ably_api_key, client_id="thinkex-backend-server")
                 self.channel = self.ably_client.channels.get('knowledge-graph-updates')
-                print("Ably client initialized successfully")
+                print("Ably Realtime client initialized successfully")
             except Exception as e:
                 print(f"Failed to initialize Ably client: {e}")
                 self.ably_client = None
@@ -101,12 +102,32 @@ class AblyManager:
             return
         
         try:
-            self.channel.publish('server-update', message)
+            await self.channel.publish('server-update', message)
             print(f"Message broadcasted via Ably: {message.get('type', 'unknown')}")
         except Exception as e:
             print(f"Failed to broadcast message via Ably: {e}")
 
+    async def close(self):
+        """Close the Ably connection"""
+        if self.ably_client:
+            await self.ably_client.close()
+
 manager = AblyManager()
+
+# FastAPI lifecycle events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Ably connection on startup"""
+    print("Starting up FastAPI application...")
+    if manager.ably_client:
+        print("Ably connection ready for real-time updates")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up Ably connection on shutdown"""
+    print("Shutting down FastAPI application...")
+    await manager.close()
+    print("Ably connection closed")
 
 # Mock data per your spec:
 # - One ClusterList titled "calculus"
