@@ -5,10 +5,13 @@ from datetime import datetime
 
 
 class QAPair(BaseModel):
-    qa_id: str = Field(alias='_id')
+    qa_id: str = Field(..., alias='_id')
     question: str
     answer: str
     created_at: Optional[str] = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+
+    class Config:
+        populate_by_name = True
 
 
 class Cluster(BaseModel):

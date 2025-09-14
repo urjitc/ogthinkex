@@ -114,6 +114,7 @@ class DatabaseService:
             qas = []
             for db_qa in db_cluster.qas:
                 qa = QAPair(
+                    _id=db_qa.qa_id,
                     qa_id=db_qa.qa_id,
                     question=db_qa.question,
                     answer=db_qa.answer,
@@ -135,6 +136,7 @@ class DatabaseService:
         qas = []
         for db_qa in db_cluster.qas:
             qa = QAPair(
+                _id=db_qa.qa_id,
                 qa_id=db_qa.qa_id,
                 question=db_qa.question,
                 answer=db_qa.answer,
@@ -147,6 +149,7 @@ class DatabaseService:
     def convert_to_api_qa_pair(self, db_qa: QAPairDB) -> QAPair:
         """Convert database Q&A pair to API model"""
         return QAPair(
+            _id=db_qa.qa_id,
             qa_id=db_qa.qa_id,
             question=db_qa.question,
             answer=db_qa.answer,
