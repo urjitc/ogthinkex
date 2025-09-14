@@ -59,10 +59,15 @@ class DatabaseService:
     # QAPair operations
     def create_qa_pair(self, cluster_id: int, question: str, answer: str) -> QAPairDB:
         """Create a new Q&A pair"""
+        # Get current max order in cluster
+        statement = select(QAPairDB.order).where(QAPairDB.cluster_id == cluster_id)
+        max_order = self.session.exec(statement).first() or 0
+        
         qa_pair = QAPairDB(
             question=question.strip(),
             answer=answer.strip(),
-            cluster_id=cluster_id
+            cluster_id=cluster_id,
+            order=max_order + 1
         )
         self.session.add(qa_pair)
         self.session.commit()
@@ -101,10 +106,11 @@ class DatabaseService:
     
     def reorder_qa_pairs(self, cluster: ClusterDB, ordered_qa_ids: List[str]) -> None:
         """Reorder Q&A pairs in a cluster"""
-        # For now, we'll implement this by updating a position field if needed
-        # Since SQLModel doesn't have built-in ordering, we could add a position field
-        # For this implementation, we'll rely on the frontend to handle ordering
-        pass
+        for position, qa_id in enumerate(ordered_qa_ids):
+            qa_pair = self.get_qa_pair_by_id(qa_id)
+            if qa_pair and qa_pair in cluster.qas:
+                qa_pair.order = position
+        self.session.commit()
     
     # Conversion methods
     def convert_to_api_cluster_list(self, db_cluster_list: ClusterListDB) -> ClusterList:
@@ -118,11 +124,12 @@ class DatabaseService:
                     qa_id=db_qa.qa_id,
                     question=db_qa.question,
                     answer=db_qa.answer,
+                    order=db_qa.order,
                     created_at=db_qa.created_at.isoformat() + "Z"
                 )
                 qas.append(qa)
             
-            cluster = Cluster(title=db_cluster.title, qas=qas)
+            cluster = Cluster(title=db_cluster.title, qas=qas, order=db_cluster.order)
             clusters.append(cluster)
         
         return ClusterList(
@@ -140,6 +147,7 @@ class DatabaseService:
                 qa_id=db_qa.qa_id,
                 question=db_qa.question,
                 answer=db_qa.answer,
+                order=db_qa.order,
                 created_at=db_qa.created_at.isoformat() + "Z"
             )
             qas.append(qa)
@@ -153,5 +161,6 @@ class DatabaseService:
             qa_id=db_qa.qa_id,
             question=db_qa.question,
             answer=db_qa.answer,
+            order=db_qa.order,
             created_at=db_qa.created_at.isoformat() + "Z"
         )

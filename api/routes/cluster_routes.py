@@ -9,6 +9,7 @@ from models import (
     DeleteQAResponse, DeleteClusterResponse
 )
 from services.ably_manager import AblyManager
+from fastapi import Query
 
 router = APIRouter()
 
@@ -25,6 +26,11 @@ def set_ably_manager(ably_manager: AblyManager):
 def get_database_service(session: Session = Depends(get_session)) -> DatabaseService:
     """Get database service instance"""
     return DatabaseService(session)
+
+
+def get_ably_manager(ably_manager: AblyManager = Depends()):
+    """Get Ably manager instance"""
+    return ably_manager
 
 
 @router.post("/cluster-lists", response_model=ClusterList, operation_id="create_cluster_list")
@@ -88,84 +94,41 @@ async def move_qa_to_cluster(
     """
     move_qa_to_cluster(cluster_list_id, qa_id, new_cluster_title) -> moves a Q/A to a new cluster.
     """
-    print(f"[DEBUG] move_qa_to_cluster called with: cluster_list_id={cluster_list_id}, qa_id={qa_id}, payload={payload}")
-    
     new_cluster_title = payload.new_cluster_title.strip()
     if not new_cluster_title:
-        error_msg = "new_cluster_title must be non-empty"
-        print(f"[ERROR] {error_msg}")
-        raise HTTPException(status_code=400, detail=error_msg)
+        raise HTTPException(status_code=400, detail="New cluster title cannot be empty")
 
-    # Get cluster list
-    print(f"[DEBUG] Looking up cluster list with ID: {cluster_list_id}")
-    db_cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
-    print(f"[DEBUG] Found cluster list: {db_cluster_list}")
-    
-    if not db_cluster_list:
-        error_msg = f"ClusterList with id '{cluster_list_id}' not found."
-        print(f"[ERROR] {error_msg}")
-        raise HTTPException(status_code=404, detail=error_msg)
-
-    # Get Q&A pair
-    print(f"[DEBUG] Looking up Q/A pair with ID: {qa_id}")
+    # Get the Q&A pair
     qa_pair = db_service.get_qa_pair_by_id(qa_id)
-    print(f"[DEBUG] Found Q/A pair: {qa_pair}")
-    
     if not qa_pair:
-        error_msg = f"Q/A with id '{qa_id}' not found."
-        print(f"[ERROR] {error_msg}")
-        raise HTTPException(status_code=404, detail=error_msg)
+        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found")
 
-    # Get old cluster title
-    old_cluster_title = qa_pair.cluster.title if qa_pair.cluster else ""
-    print(f"[DEBUG] Current cluster for Q/A: {old_cluster_title}")
+    # Get current cluster
+    current_cluster = db_service.get_cluster_by_id(qa_pair.cluster_id)
+    if not current_cluster:
+        raise HTTPException(status_code=404, detail="Current cluster not found")
 
-    # Get destination cluster
-    print(f"[DEBUG] Looking up destination cluster with title: {new_cluster_title}")
-    dest_cluster = db_service.get_cluster_by_title(db_cluster_list.id, new_cluster_title)
-    print(f"[DEBUG] Found destination cluster: {dest_cluster}")
-    
-    if not dest_cluster:
-        error_msg = f"Destination cluster '{new_cluster_title}' not found in list '{cluster_list_id}'."
-        print(f"[ERROR] {error_msg}")
-        raise HTTPException(status_code=404, detail=error_msg)
+    # Get new cluster
+    new_cluster = db_service.get_cluster_by_title(
+        cluster_list_id=cluster_list_id,
+        title=new_cluster_title
+    )
+    if not new_cluster:
+        raise HTTPException(status_code=404, detail=f"Target cluster '{new_cluster_title}' not found")
 
-    # If source and destination are the same, do nothing
-    if qa_pair.cluster_id == dest_cluster.id:
-        msg = "Source and destination clusters are the same. No action taken."
-        print(f"[INFO] {msg}")
-        return MoveQAResponse(
-            message=msg,
-            qa_id=qa_id,
-            old_cluster_title=old_cluster_title,
-            new_cluster_title=new_cluster_title
-        )
-
-    print(f"[DEBUG] Moving Q/A from cluster ID {qa_pair.cluster_id} to {dest_cluster.id}")
-    
     # Move the Q&A pair
-    db_service.move_qa_pair(qa_pair, dest_cluster)
-    print("[DEBUG] Successfully moved Q/A pair in database")
-
-    # Broadcast the update
-    if manager and manager.is_ready():
-        print("[DEBUG] Broadcasting update to connected clients")
-        await manager.broadcast({
-            "type": "cluster_list_update",
-            "payload": {
-                "list_id": cluster_list_id
-            }
-        })
-    else:
-        print("[WARNING] Manager not ready, skipping broadcast")
-
-    msg = f"Moved Q/A from '{old_cluster_title}' to '{new_cluster_title}'."
-    print(f"[INFO] {msg}")
+    moved_qa = db_service.move_qa_pair(qa_pair, new_cluster)
     
+    # Set order to end of new cluster
+    statement = select(QAPairDB.order).where(QAPairDB.cluster_id == new_cluster.id)
+    max_order = db_service.session.exec(statement).first() or 0
+    moved_qa.order = max_order + 1
+    db_service.session.commit()
+
     return MoveQAResponse(
-        message=msg,
+        success=True,
+        message=f"Moved Q/A {qa_id} to cluster {new_cluster_title}",
         qa_id=qa_id,
-        old_cluster_title=old_cluster_title,
         new_cluster_title=new_cluster_title
     )
 
@@ -436,4 +399,57 @@ async def delete_cluster(
     return DeleteClusterResponse(
         message=f'Deleted cluster "{deleted_cluster_title}".',
         clusterName=deleted_cluster_title
+    )
+
+
+@router.delete(
+    "/cluster-lists/{cluster_list_id}/qa/{qa_id}",
+    response_model=DeleteQAResponse,
+    operation_id="delete_qa_from_cluster",
+)
+async def delete_qa_from_cluster(
+    cluster_list_id: str,
+    qa_id: str,
+    cluster_name: str = Query(..., alias="clusterName"),
+    db_service: DatabaseService = Depends(get_database_service),
+    manager: AblyManager = Depends(get_ably_manager),
+):
+    """Delete a Q&A pair from a cluster"""
+    # Get the cluster
+    cluster = db_service.get_cluster_by_title(cluster_list_id, cluster_name)
+    if not cluster:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found")
+
+    # Get the Q&A pair
+    qa_pair = db_service.get_qa_pair_by_id(qa_id)
+    if not qa_pair:
+        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found")
+
+    # Verify the Q&A pair is in the cluster
+    if qa_pair not in cluster.qas:
+        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found in cluster '{cluster_name}'.")
+
+    # Delete the Q&A pair
+    db_service.delete_qa_pair(qa_pair)
+
+    # Update the order of the remaining Q&A pairs
+    for i, qa in enumerate(cluster.qas):
+        qa.order = i + 1
+    db_service.session.commit()
+
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.publish(
+            "knowledge-graph-updates",
+            {
+                "type": "qa_deleted",
+                "cluster_id": cluster_list_id,
+                "cluster_name": cluster_name,
+                "qa_id": qa_id,
+            },
+        )
+
+    return DeleteQAResponse(
+        success=True,
+        message=f"Q/A pair {qa_id} deleted from cluster {cluster_name}",
     )
