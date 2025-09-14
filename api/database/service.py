@@ -129,7 +129,7 @@ class DatabaseService:
                 )
                 qas.append(qa)
             
-            cluster = Cluster(title=db_cluster.title, qas=qas, order=db_cluster.order)
+            cluster = Cluster(title=db_cluster.title, qas=qas)
             clusters.append(cluster)
         
         return ClusterList(
