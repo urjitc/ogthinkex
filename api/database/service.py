@@ -43,6 +43,11 @@ class DatabaseService:
         self.session.refresh(cluster)
         return cluster
     
+    def get_cluster_by_id(self, cluster_id: int) -> Optional[ClusterDB]:
+        """Get cluster by ID"""
+        statement = select(ClusterDB).where(ClusterDB.id == cluster_id)
+        return self.session.exec(statement).first()
+    
     def get_cluster_by_title(self, cluster_list_id: int, title: str) -> Optional[ClusterDB]:
         """Get cluster by title (case insensitive)"""
         statement = select(ClusterDB).where(
