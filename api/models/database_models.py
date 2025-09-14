@@ -12,7 +12,6 @@ class QAPairDB(SQLModel, table=True):
     qa_id: str = Field(default_factory=lambda: str(uuid4()), unique=True, index=True)
     question: str = Field(index=True)
     answer: str
-    order: int = Field(default=0, description="Position in cluster")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Foreign key to cluster

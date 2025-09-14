@@ -12,6 +12,7 @@ import type { TreeNode, BreadcrumbItem } from './types';
 import { useAllClusterLists } from '../../hooks/useAllClusterLists';
 import { useAnimation } from '../../hooks/use-animation';
 import { useDragReorder } from '../../hooks/useDragReorder';
+import { PUBLIC_API_BASE_URL } from '../../config';
 import { DndContext, type DragEndEvent, type DragStartEvent, type DragCancelEvent, DragOverlay, useSensor, useSensors, PointerSensor, defaultDropAnimationSideEffects } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
@@ -41,7 +42,7 @@ const fetchClusterList = async (listId: string | null): Promise<ClusterList | nu
   console.groupCollapsed('[DEBUG] Fetching cluster list data');
   console.log('Requesting cluster list ID:', listId);
   
-  const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${listId}`, {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/cluster-lists/${listId}`, {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
@@ -122,7 +123,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     const deleteClusterMutation = useMutation({
     mutationFn: async (clusterName: string) => {
       if (!selectedListId) throw new Error("No list ID provided for deletion.");
-      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/cluster/${encodeURIComponent(clusterName)}`, {
+      const response = await fetch(`${PUBLIC_API_BASE_URL}/cluster-lists/${selectedListId}/cluster/${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -138,7 +139,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const deleteQAMutation = useMutation({
     mutationFn: async ({ qaId, clusterName }: { qaId: string; clusterName: string }) => {
       if (!selectedListId) throw new Error("No list ID provided for deletion.");
-      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
+      const response = await fetch(`${PUBLIC_API_BASE_URL}/cluster-lists/${selectedListId}/qa/${qaId}?clusterName=${encodeURIComponent(clusterName)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
