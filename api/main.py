@@ -63,6 +63,10 @@ class MoveQAResponse(BaseModel):
     old_cluster_title: str
     new_cluster_title: str
 
+class ReorderQAsRequest(BaseModel):
+    cluster_title: str
+    ordered_qa_ids: List[str]
+
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -553,6 +557,45 @@ async def move_qa_to_cluster(cluster_list_id: str, qa_id: str, payload: MoveQARe
             old_cluster_title=old_cluster_title,
             new_cluster_title=new_cluster_title
         )
+
+@app.patch("/cluster-lists/{cluster_list_id}/reorder", status_code=200)
+async def reorder_qas_in_cluster(cluster_list_id: str, request: ReorderQAsRequest):
+    with lock:
+        cluster_list = CLUSTER_LISTS.get(cluster_list_id)
+        if not cluster_list:
+            raise HTTPException(status_code=404, detail="Cluster list not found")
+
+        cluster_idx = _find_cluster_idx_case_insensitive(cluster_list, request.cluster_title)
+        if cluster_idx is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{request.cluster_title}' not found")
+
+        cluster = cluster_list.clusters[cluster_idx]
+        
+        # Create a map of QA IDs to QA pairs for efficient lookup
+        qa_map = {qa.qa_id: qa for qa in cluster.qas}
+        
+        # Create the new ordered list of QAs
+        new_qas = []
+        for qa_id in request.ordered_qa_ids:
+            if qa_id in qa_map:
+                new_qas.append(qa_map[qa_id])
+        
+        # Check if all original QAs are still present
+        if len(new_qas) != len(cluster.qas) or set(request.ordered_qa_ids) != set(qa_map.keys()):
+            raise HTTPException(status_code=400, detail="Mismatched QA items during reorder")
+
+        cluster.qas = new_qas
+
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": cluster_list_id
+            }
+        })
+
+    return {"message": f"QAs in cluster '{request.cluster_title}' reordered successfully."}
 
 # For backward compatibility with the current frontend, which expects /clusters
 @app.get(

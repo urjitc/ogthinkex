@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Cluster, QAPair } from './ClusterListWithWebSocket';
 import QACard from './QACard';
 
@@ -159,16 +160,18 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onD
         
         {/* Cards Container */}
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
-          {cluster.qas.map(qa => (
-                        <QACard 
-              key={qa._id} 
-              item={qa} 
-              clusterTitle={cluster.title}
-              onOpenModal={() => onOpenQAModal(qa)}
-              onDelete={() => onDeleteQA(qa._id, cluster.title)}
-              animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}
-            />
-          ))}
+          <SortableContext items={cluster.qas.map(qa => qa._id)} strategy={verticalListSortingStrategy}>
+            {cluster.qas.map(qa => (
+              <QACard 
+                key={qa._id} 
+                item={qa} 
+                clusterTitle={cluster.title}
+                onOpenModal={() => onOpenQAModal(qa)}
+                onDelete={() => onDeleteQA(qa._id, cluster.title)}
+                animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}
+              />
+            ))}
+          </SortableContext>
         </div>
       </div>
     </>
