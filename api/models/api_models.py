@@ -9,7 +9,6 @@ class QAPair(BaseModel):
     question: str
     answer: str
     created_at: Optional[str] = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    order: int = Field(default=0, description="Position of QA pair in cluster")
 
     class Config:
         populate_by_name = True
