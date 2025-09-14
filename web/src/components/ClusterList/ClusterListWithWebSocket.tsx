@@ -11,7 +11,8 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 import type { TreeNode, BreadcrumbItem } from './types';
 import { useAllClusterLists } from '../../hooks/useAllClusterLists';
 import { useAnimation } from '../../hooks/use-animation';
-import { DndContext, type DragEndEvent, type DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, type DragStartEvent, type DragCancelEvent, DragOverlay, useSensor, useSensors, PointerSensor, defaultDropAnimationSideEffects } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 
 // Define types directly in the component for now
 export interface QAPair {
@@ -65,6 +66,8 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'qa' | 'cluster' } | null>(null);
+  const [activeDragData, setActiveDragData] = useState<{ item: QAPair; clusterTitle: string } | null>(null);
+  const [optimisticClusterData, setOptimisticClusterData] = useState<ClusterList | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Use React Query to fetch data
@@ -116,42 +119,77 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const moveQAMutation = useMutation({
     mutationFn: async ({ qaId, newClusterTitle }: { qaId: string; newClusterTitle: string }) => {
       if (!selectedListId) throw new Error("No list ID selected.");
-
       const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/qa/${qaId}/move`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_cluster_title: newClusterTitle }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to move Q/A item');
-      }
+      if (!response.ok) throw new Error('Failed to move Q/A item');
       return response.json();
     },
     onMutate: async ({ qaId, newClusterTitle }) => {
       await queryClient.cancelQueries({ queryKey: ['clusterList', selectedListId] });
-      const previousClusterList = queryClient.getQueryData(['clusterList', selectedListId]);
+      const previousClusterList = queryClient.getQueryData<ClusterList>(['clusterList', selectedListId]);
 
-      queryClient.setQueryData(['clusterList', selectedListId], (oldData: ClusterList | null | undefined) => {
-        if (!oldData) return null;
-
+      queryClient.setQueryData<ClusterList | undefined>(['clusterList', selectedListId], (oldData) => {
+        if (!oldData) return undefined;
         let draggedItem: QAPair | null = null;
         const newClusters = oldData.clusters.map(cluster => {
-            const itemIndex = cluster.qas.findIndex(qa => qa._id === qaId);
-            if (itemIndex > -1) {
-                [draggedItem] = cluster.qas.splice(itemIndex, 1);
+          const qas = cluster.qas.filter(qa => {
+            if (qa._id === qaId) {
+              draggedItem = qa;
+              return false;
             }
-            return { ...cluster, qas: [...cluster.qas] }; 
+            return true;
+          });
+          return { ...cluster, qas };
         });
-
         if (draggedItem) {
-            const destCluster = newClusters.find(c => c.title === newClusterTitle);
-            if (destCluster) {
-                destCluster.qas.push(draggedItem);
-            }
+          const destCluster = newClusters.find(c => c.title === newClusterTitle);
+          if (destCluster) destCluster.qas.push(draggedItem);
         }
+        return { ...oldData, clusters: newClusters };
+      });
+
+      return { previousClusterList };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousClusterList) {
+        queryClient.setQueryData(['clusterList', selectedListId], context.previousClusterList);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['clusterList', selectedListId] });
+      setOptimisticClusterData(null); // Clear local state only after mutation is settled
+    },
+  });
+
+  const reorderQAMutation = useMutation({
+    mutationFn: async ({ clusterTitle, orderedQaIds }: { clusterTitle: string; orderedQaIds: string[] }) => {
+      if (!selectedListId) throw new Error("No list ID selected.");
+      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/reorder`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cluster_title: clusterTitle, ordered_qa_ids: orderedQaIds }),
+      });
+      if (!response.ok) throw new Error('Failed to reorder Q/A items');
+      return response.json();
+    },
+    onMutate: async ({ clusterTitle, orderedQaIds }) => {
+      await queryClient.cancelQueries({ queryKey: ['clusterList', selectedListId] });
+      const previousClusterList = queryClient.getQueryData<ClusterList>(['clusterList', selectedListId]);
+
+      queryClient.setQueryData<ClusterList | undefined>(['clusterList', selectedListId], (oldData) => {
+        if (!oldData) return undefined;
+
+        const newClusters = oldData.clusters.map(cluster => {
+          if (cluster.title === clusterTitle) {
+            const qaMap = new Map(cluster.qas.map(qa => [qa._id, qa]));
+            const reorderedQas = orderedQaIds.map(id => qaMap.get(id)).filter((qa): qa is QAPair => !!qa);
+            return { ...cluster, qas: reorderedQas };
+          }
+          return cluster;
+        });
 
         return { ...oldData, clusters: newClusters };
       });
@@ -168,7 +206,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     },
   });
 
-    const handleDeleteQA = (qaId: string, clusterName: string) => {
+  const handleDeleteQA = (qaId: string, clusterName: string) => {
     setItemToDelete({ id: qaId, name: clusterName, type: 'qa' });
   };
 
@@ -176,7 +214,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     setItemToDelete({ id: clusterName, name: clusterName, type: 'cluster' });
   };
 
-    const confirmDelete = () => {
+  const confirmDelete = () => {
     if (!itemToDelete) return;
 
     if (itemToDelete.type === 'qa') {
@@ -196,9 +234,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     })
   );
 
-        const [activeDragData, setActiveDragData] = useState<{ item: QAPair; clusterTitle: string } | null>(null);
-
-    const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
     setActiveDragData({
@@ -207,16 +243,93 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     });
   };
 
-        const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragCancel = (event: DragCancelEvent) => {
     setActiveId(null);
     setActiveDragData(null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.data.current?.clusterTitle !== over.id) {
-      const qaId = active.id as string;
-      const newClusterTitle = over.id as string;
+    
+    if (!over) {
+      setActiveId(null);
+      setActiveDragData(null);
+      return;
+    }
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    const activeClusterTitle = active.data.current?.clusterTitle as string;
+    // Note: `over.id` can be a droppable container (cluster) or a sortable item (QA card).
+    // `over.data.current?.clusterTitle` will exist if hovering over a QA card.
+    const overClusterTitle = over.data.current?.clusterTitle || over.id as string;
+
+    if (activeClusterTitle === overClusterTitle) {
+      // Reordering within the same cluster
+      const currentData = clusterData;
+      if (currentData && activeId !== overId) {
+        const cluster = currentData.clusters.find(c => c.title === activeClusterTitle);
+        if (cluster) {
+          const oldIndex = cluster.qas.findIndex(qa => qa._id === activeId);
+          const newIndex = cluster.qas.findIndex(qa => qa._id === overId);
+
+          if (oldIndex !== -1 && newIndex !== -1) {
+            const reorderedQas = arrayMove(cluster.qas, oldIndex, newIndex);
+            const orderedQaIds = reorderedQas.map(qa => qa._id);
+
+            // Optimistic update for reordering
+            const newClusters = currentData.clusters.map(c => 
+              c.title === activeClusterTitle ? { ...c, qas: reorderedQas } : c
+            );
+            setOptimisticClusterData({ ...currentData, clusters: newClusters });
+
+            reorderQAMutation.mutate({ clusterTitle: activeClusterTitle, orderedQaIds });
+          }
+        }
+      }
+    } else {
+      // Moving to a different cluster
+      const qaId = activeId;
+      const newClusterTitle = overClusterTitle;
+
+      // Optimistic update for moving
+      const currentData = clusterData;
+      if (currentData) {
+        let draggedItem: QAPair | null = null;
+        const sourceCluster = currentData.clusters.find(c => c.title === activeClusterTitle);
+        
+        if (sourceCluster) {
+          const itemIndex = sourceCluster.qas.findIndex(qa => qa._id === qaId);
+          if (itemIndex > -1) {
+            draggedItem = sourceCluster.qas[itemIndex];
+          }
+        }
+
+        if (draggedItem) {
+          setOptimisticClusterData(prevData => {
+            if (!prevData) return null;
+            // Remove from old cluster
+            const newClusters = prevData.clusters.map(c => {
+              if (c.title === activeClusterTitle) {
+                return { ...c, qas: c.qas.filter(qa => qa._id !== qaId) };
+              }
+              return c;
+            });
+            // Add to new cluster
+            const destClusterIndex = newClusters.findIndex(c => c.title === newClusterTitle);
+            if (destClusterIndex > -1) {
+              newClusters[destClusterIndex].qas.push(draggedItem!);
+            }
+            return { ...prevData, clusters: newClusters };
+          });
+        }
+      }
 
       moveQAMutation.mutate({ qaId, newClusterTitle });
     }
+
+    setActiveId(null);
+    setActiveDragData(null);
   };
 
   const sidebarStructure = useMemo(() => {
@@ -247,20 +360,22 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   }, [clusterData]);
 
   // Filter clusters and QAs based on search
+  const displayData = optimisticClusterData || clusterData;
+
   const allItems = useMemo(() => {
-    if (!clusterData) return [];
-    return clusterData.clusters.flatMap(cluster => cluster.qas);
-  }, [clusterData]);
+    if (!displayData) return [];
+    return displayData.clusters.flatMap(cluster => cluster.qas);
+  }, [displayData]);
 
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const { animatedItems, scrollToItemId } = useAnimation(allItems, [allItems], animationsEnabled);
 
   const filteredClusters = useMemo(() => {
-    if (!clusterData) return [];
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return clusterData.clusters;
+    if (!displayData) return [];
+        const q = searchQuery.trim().toLowerCase();
+    if (!q) return displayData.clusters;
 
-    return clusterData.clusters
+        return displayData.clusters
       .map(cluster => {
         const filteredQas = cluster.qas.filter(
           qa =>
@@ -274,7 +389,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         return null;
       })
       .filter((cluster): cluster is Cluster => cluster !== null);
-  }, [clusterData, searchQuery]);
+    }, [displayData, searchQuery]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -435,7 +550,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveId(null)}
+      onDragCancel={handleDragCancel}
     >
     <div className="flex h-screen bg-gray-900">
 
@@ -578,7 +693,12 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         onClose={closeQAModal}
       />
 
-                  <DragOverlay>
+      <DragOverlay
+        dropAnimation={{
+          duration: 500,
+          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+        }}
+      >
         {activeDragData ? (
           <QACard
             item={activeDragData.item}

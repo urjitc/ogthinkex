@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef } from 'react';
-import { useDraggable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { QAPair } from './ClusterListWithWebSocket';
 
 interface QACardProps {
@@ -12,7 +13,7 @@ interface QACardProps {
 }
 
 const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, onOpenModal, onDelete, animationState, isOverlay, ...props }, ref) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item._id,
     data: {
       clusterTitle: clusterTitle,
@@ -21,11 +22,10 @@ const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, on
     disabled: isOverlay, // Disable dragging for the overlay itself
   });
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
-    : undefined;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const [animationClass, setAnimationClass] = useState('');
 
@@ -44,15 +44,6 @@ const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, on
     }
   }, [animationState]);
 
-  // When dragging, render a placeholder to keep the space
-  if (isDragging && !isOverlay) {
-    return (
-      <div
-        ref={setNodeRef}
-        className="bg-zinc-950/50 rounded-lg border border-dashed border-zinc-700 h-24"
-      />
-    );
-  }
 
   return (
     <div 
@@ -61,7 +52,9 @@ const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, on
       {...attributes}
       {...listeners}
       id={`qa-card-${item._id}`}
-      className={`bg-zinc-950/50 rounded-lg border border-zinc-800 shadow-sm hover:shadow-lg hover:border-zinc-700 transition-all duration-200 group ${animationClass}`}
+      className={`bg-zinc-950/50 rounded-lg border border-zinc-800 shadow-sm hover:shadow-lg hover:border-zinc-700 transition-all duration-200 group ${animationClass} ${
+        isDragging && !isOverlay ? 'invisible transition-none' : ''
+      }`}
       {...props}
     >
       {/* Header */}
