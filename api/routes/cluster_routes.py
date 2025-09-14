@@ -128,7 +128,7 @@ async def move_qa_to_cluster(
 
     # Get destination cluster
     print(f"[DEBUG] Looking up destination cluster with title: {new_cluster_title}")
-    dest_cluster = db_service.get_cluster_by_title(db_cluster_list.id, new_cluster_title)
+    dest_cluster = db_service.get_cluster_by_title(cluster_list_id, new_cluster_title)
     print(f"[DEBUG] Found destination cluster: {dest_cluster}")
     
     if not dest_cluster:
@@ -324,8 +324,8 @@ async def add_qa(
     # Get or create cluster
     cluster = db_service.get_cluster_by_title(payload.cluster_list_id, cluster_name)
     if not cluster:
-        # Create new cluster using the UUID string directly
-        cluster = db_service.create_cluster(db_cluster_list.id, cluster_name)
+        # Create new cluster using the UUID string
+        cluster = db_service.create_cluster(payload.cluster_list_id, cluster_name)
 
     # Create Q&A pair
     qa_pair = db_service.create_qa_pair(cluster.id, payload.question, payload.answer)
