@@ -34,7 +34,7 @@ def get_ably_manager(ably_manager: AblyManager = Depends()):
 
 
 @router.post("/cluster-lists", response_model=ClusterList, operation_id="create_cluster_list")
-def create_cluster_list(
+async def create_cluster_list(
     payload: CreateClusterListRequest,
     db_service: DatabaseService = Depends(get_database_service)
 ):
@@ -42,6 +42,16 @@ def create_cluster_list(
     create_cluster_list(title) -> creates a new, empty cluster list.
     """
     db_cluster_list = db_service.create_cluster_list(payload.title)
+    
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": db_cluster_list.list_id
+            }
+        })
+    
     return db_service.convert_to_api_cluster_list(db_cluster_list)
 
 
@@ -399,7 +409,7 @@ async def delete_qa(
     )
 
 
-@router.delete("/cluster/{cluster_name}", response_model=DeleteClusterResponse, operation_id="delete_cluster")
+@router.delete("/cluster-lists/{cluster_list_id}/cluster/{cluster_name}", response_model=DeleteClusterResponse, operation_id="delete_cluster")
 async def delete_cluster(
     cluster_name: str, 
     cluster_list_id: str,
@@ -408,11 +418,15 @@ async def delete_cluster(
     """
     delete_cluster(cluster_name, cluster_list_id) -> deletes a cluster and all its Q/As.
     """
+    print(f"DELETE CLUSTER - cluster_name: {cluster_name}, cluster_list_id: {cluster_list_id}")
+    
     if not cluster_list_id:
         raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
 
     # Get cluster list
+    print(f"Looking up cluster list with ID: {cluster_list_id}")
     db_cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    print(f"Found cluster list: {db_cluster_list}")
     if not db_cluster_list:
         raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
 
@@ -421,9 +435,14 @@ async def delete_cluster(
         raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
 
     # Get cluster
-    cluster = db_service.get_cluster_by_title(db_cluster_list.id, cluster_name_stripped)
+    print(f"Looking up cluster with title: '{cluster_name_stripped}' in list ID: {db_cluster_list.list_id}")
+    cluster = db_service.get_cluster_by_title(db_cluster_list.list_id, cluster_name_stripped)
+    print(f"Found cluster: {cluster}")
     if not cluster:
+        print(f"Cluster not found - Title: '{cluster_name_stripped}', List ID: {db_cluster_list.id}")
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name_stripped}' not found.")
+    
+    print(f"Deleting cluster: ID={cluster.id}, Title='{cluster.title}'")
 
     deleted_cluster_title = cluster.title
     
@@ -477,15 +496,12 @@ async def delete_qa_from_cluster(
 
     # Broadcast the update
     if manager and manager.is_ready():
-        await manager.publish(
-            "knowledge-graph-updates",
-            {
-                "type": "qa_deleted",
-                "cluster_id": cluster_list_id,
-                "cluster_name": cluster_name,
-                "qa_id": qa_id,
-            },
-        )
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": cluster_list_id
+            }
+        })
 
     return DeleteQAResponse(
         message=f"Q/A pair {qa_id} deleted from cluster {cluster_name}",
