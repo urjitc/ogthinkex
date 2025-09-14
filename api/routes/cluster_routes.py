@@ -322,9 +322,9 @@ async def add_qa(
         raise HTTPException(status_code=400, detail="answer must be non-empty")
 
     # Get or create cluster
-    cluster = db_service.get_cluster_by_title(db_cluster_list.id, cluster_name)
+    cluster = db_service.get_cluster_by_title(payload.cluster_list_id, cluster_name)
     if not cluster:
-        # Create new cluster
+        # Create new cluster using the UUID string directly
         cluster = db_service.create_cluster(db_cluster_list.id, cluster_name)
 
     # Create Q&A pair
