@@ -25,7 +25,7 @@ class DatabaseService:
             from uuid import UUID
             # Ensure the input is a valid UUID string
             uuid_obj = UUID(str(list_id))
-            # Convert back to string to ensure proper comparison
+            # Look up by list_id (UUID) not the primary key id
             return self.session.exec(
                 select(ClusterListDB).where(ClusterListDB.list_id == str(uuid_obj))
             ).first()
@@ -61,23 +61,39 @@ class DatabaseService:
     def get_cluster_by_title(self, cluster_list_uuid: str, title: str) -> Optional[ClusterDB]:
         """Get cluster by title (case insensitive)"""
         try:
-            from uuid import UUID
-            # Ensure the input is a valid UUID string
-            uuid_obj = UUID(str(cluster_list_uuid))
-            # First get the cluster list by its UUID to get the integer ID
+            print(f"[DEBUG] get_cluster_by_title - list_uuid: {cluster_list_uuid}, title: {title}")
+            # First find the cluster list by UUID to get its integer ID
+            print(f"[DEBUG] Looking up cluster list with UUID: {cluster_list_uuid}")
             cluster_list = self.session.exec(
-                select(ClusterListDB).where(ClusterListDB.list_id == str(uuid_obj))
+                select(ClusterListDB).where(ClusterListDB.list_id == cluster_list_uuid)
             ).first()
+            
             if not cluster_list:
+                print(f"[DEBUG] Cluster list not found with UUID: {cluster_list_uuid}")
                 return None
                 
+            print(f"[DEBUG] Found cluster list - ID: {cluster_list.id}, Title: {cluster_list.title}")
+            
             # Then find the cluster by title and the integer cluster_list_id
+            title_stripped = title.strip()
+            print(f"[DEBUG] Looking for cluster with title: '{title_stripped}' in list ID: {cluster_list.id}")
+            
             statement = select(ClusterDB).where(
                 ClusterDB.cluster_list_id == cluster_list.id,
-                ClusterDB.title.ilike(title.strip())
+                ClusterDB.title.ilike(title_stripped)
             )
-            return self.session.exec(statement).first()
-        except (ValueError, AttributeError):
+            
+            # Print the generated SQL for debugging
+            print(f"[DEBUG] SQL Query: {statement}")
+            
+            cluster = self.session.exec(statement).first()
+            print(f"[DEBUG] Found cluster: {cluster}")
+            return cluster
+            
+        except Exception as e:
+            print(f"[ERROR] Exception in get_cluster_by_title: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def delete_cluster(self, cluster: ClusterDB) -> None:
