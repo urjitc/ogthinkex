@@ -1,14 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
+import { useDraggable } from '@dnd-kit/core';
 import type { QAPair } from './ClusterListWithWebSocket';
 
 interface QACardProps {
+  clusterTitle: string;
   item: QAPair;
   onOpenModal: () => void;
   onDelete: () => void;
   animationState?: 'new' | 'updated';
+  isOverlay?: boolean; // Add this prop to differentiate overlay rendering
 }
 
-const QACard: React.FC<QACardProps> = ({ item, onOpenModal, onDelete, animationState }) => {
+const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, onOpenModal, onDelete, animationState, isOverlay, ...props }, ref) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: item._id,
+    data: {
+      clusterTitle: clusterTitle,
+      item: item,
+    },
+    disabled: isOverlay, // Disable dragging for the overlay itself
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
+
   const [animationClass, setAnimationClass] = useState('');
 
   useEffect(() => {
@@ -25,10 +43,26 @@ const QACard: React.FC<QACardProps> = ({ item, onOpenModal, onDelete, animationS
       return () => clearTimeout(timer);
     }
   }, [animationState]);
+
+  // When dragging, render a placeholder to keep the space
+  if (isDragging && !isOverlay) {
+    return (
+      <div
+        ref={setNodeRef}
+        className="bg-zinc-950/50 rounded-lg border border-dashed border-zinc-700 h-24"
+      />
+    );
+  }
+
   return (
-        <div 
+    <div 
+      ref={ref || setNodeRef} // Use forwarded ref for overlay, or internal ref for the actual item
+      style={style}
+      {...attributes}
+      {...listeners}
       id={`qa-card-${item._id}`}
       className={`bg-zinc-950/50 rounded-lg border border-zinc-800 shadow-sm hover:shadow-lg hover:border-zinc-700 transition-all duration-200 group ${animationClass}`}
+      {...props}
     >
       {/* Header */}
       <div className="p-4">
@@ -54,6 +88,6 @@ const QACard: React.FC<QACardProps> = ({ item, onOpenModal, onDelete, animationS
       </div>
     </div>
   );
-};
+});
 
 export default QACard;
