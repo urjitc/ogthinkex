@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { QAPair, ClusterList } from '../components/ClusterList/ClusterListWithWebSocket';
+import { PUBLIC_API_BASE_URL } from '../config';
 
 interface DragReorderOutcome {
   reordered: ClusterList;
@@ -22,13 +23,46 @@ export const useDragReorder = (clusterData: ClusterList | null, selectedListId: 
   const moveQAMutation = useMutation({
     mutationFn: async ({ qaId, newClusterTitle }: { qaId: string; newClusterTitle: string }) => {
       if (!selectedListId) throw new Error("No list ID selected.");
-      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/qa/${qaId}/move`, {
+      
+      const url = `${PUBLIC_API_BASE_URL}/cluster-lists/${selectedListId}/qa/${qaId}/move`;
+      const requestBody = { new_cluster_title: newClusterTitle };
+      
+      console.log('[DEBUG] Move Q/A Request:', {
+        url,
+        method: 'PATCH',
+        body: requestBody,
+        selectedListId,
+        qaId,
+        newClusterTitle
+      });
+      
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_cluster_title: newClusterTitle }),
+        body: JSON.stringify(requestBody),
       });
-      if (!response.ok) throw new Error('Failed to move Q/A item');
-      return response.json();
+      
+      console.log('[DEBUG] Move Q/A Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        ok: response.ok
+      });
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('[DEBUG] Error response data:', errorData);
+        } catch (e) {
+          console.error('[DEBUG] Could not parse error response as JSON');
+        }
+        throw new Error(`Failed to move Q/A item: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('[DEBUG] Move Q/A Success:', result);
+      return result;
     },
     onMutate: async ({ qaId, newClusterTitle }) => {
       await client.cancelQueries({ queryKey: ['clusterList', selectedListId] });
@@ -69,7 +103,7 @@ export const useDragReorder = (clusterData: ClusterList | null, selectedListId: 
   const reorderQAMutation = useMutation({
     mutationFn: async ({ clusterTitle, orderedQaIds }: { clusterTitle: string; orderedQaIds: string[] }) => {
       if (!selectedListId) throw new Error("No list ID selected.");
-      const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${selectedListId}/reorder`, {
+      const response = await fetch(`${PUBLIC_API_BASE_URL}/cluster-lists/${selectedListId}/reorder`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_title: clusterTitle, ordered_qa_ids: orderedQaIds }),

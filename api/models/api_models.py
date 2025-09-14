@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 class QAPair(BaseModel):
-    qa_id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
+    qa_id: str = Field(alias='_id')
     question: str
     answer: str
     created_at: Optional[str] = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
@@ -17,8 +17,8 @@ class Cluster(BaseModel):
 
 
 class ClusterList(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    title: str  # e.g., "calculus"
+    id: str
+    title: str
     clusters: List[Cluster] = Field(default_factory=list)
 
 

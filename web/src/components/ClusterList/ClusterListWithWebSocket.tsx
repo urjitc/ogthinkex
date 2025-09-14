@@ -38,18 +38,27 @@ export interface ClusterList {
 const fetchClusterList = async (listId: string | null): Promise<ClusterList | null> => {
   if (!listId) return null;
 
+  console.groupCollapsed('[DEBUG] Fetching cluster list data');
+  console.log('Requesting cluster list ID:', listId);
+  
   const response = await fetch(`https://thinkex.onrender.com/cluster-lists/${listId}`, {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
   });
+  
   if (!response.ok) {
-    if (response.status === 404) {
-      return null; // Handle case where listId doesn't exist
-    }
+    console.error('Fetch error:', response.status);
+    console.groupEnd();
+    if (response.status === 404) return null;
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
-  return response.json();
+  
+  const data = await response.json();
+  console.log('Raw API response:', JSON.parse(JSON.stringify(data)));
+  console.groupEnd();
+  
+  return data;
 };
 
 const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initialListId }) => {
@@ -82,10 +91,33 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     queryFn: () => fetchClusterList(selectedListId),
     enabled: !!selectedListId, // Only run if a list is selected
     placeholderData: keepPreviousData,
+    onSuccess: (data) => {
+      console.groupCollapsed('[DEBUG] Cluster data loaded');
+      console.log('Selected list ID:', selectedListId);
+      console.log('Received data:', data);
+      console.log('First QA ID:', data?.clusters?.[0]?.qas?.[0]?._id);
+      console.groupEnd();
+    }
   });
+
+  useEffect(() => {
+    if (clusterData) {
+      console.log('Cluster Data:', {
+        id: clusterData.id,
+        title: clusterData.title,
+        clusterCount: clusterData.clusters?.length,
+        qaCount: clusterData.clusters?.reduce((acc, c) => acc + c.qas.length, 0),
+        firstCluster: clusterData.clusters?.[0],
+        firstQA: clusterData.clusters?.[0]?.qas?.[0]
+      });
+    } else {
+      console.log('No cluster data available');
+    }
+  }, [clusterData]);
 
   // Use the new drag reorder hook
   const { reorder, dragItems } = useDragReorder(clusterData || null, selectedListId);
+  console.log('Drag items:', dragItems?.clusters?.map(c => ({title: c.title, qaCount: c.qas.length})));
 
     const deleteClusterMutation = useMutation({
     mutationFn: async (clusterName: string) => {
@@ -209,7 +241,8 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
   const filteredClusters = useMemo(() => {
     if (!displayData) return [];
-        const q = searchQuery.trim().toLowerCase();
+    console.log('Filtered clusters data:', displayData.clusters);
+    const q = searchQuery.trim().toLowerCase();
     if (!q) return displayData.clusters;
 
         return displayData.clusters
@@ -499,18 +532,21 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
             onScroll={updateScrollbar}
           >
             <div className="flex gap-6 h-full px-6 pb-3">
-              {filteredClusters.map((cluster, index) => (
-                                                <KanbanColumn 
-                  key={cluster.title} 
-                  cluster={cluster} 
-                  onOpenQAModal={openQAModal}
-                  onDeleteQA={handleDeleteQA}
-                  onDeleteCluster={handleDeleteCluster}
-                  isAnimated={animatedNodeId === cluster.title}
-                  columnIndex={index}
-                  animatedItems={animatedItems}
-                />
-              ))}
+              {filteredClusters.map((cluster, index) => {
+                console.log('Rendering cluster:', cluster.title, 'with', cluster.qas.length, 'QAs');
+                return (
+                  <KanbanColumn 
+                    key={cluster.title} 
+                    cluster={cluster} 
+                    onOpenQAModal={openQAModal}
+                    onDeleteQA={handleDeleteQA}
+                    onDeleteCluster={handleDeleteCluster}
+                    isAnimated={animatedNodeId === cluster.title}
+                    columnIndex={index}
+                    animatedItems={animatedItems}
+                  />
+                );
+              })}
               <div className="flex-shrink-0 w-px" />
             </div>
           </div>

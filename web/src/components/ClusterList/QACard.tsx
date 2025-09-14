@@ -13,6 +13,11 @@ interface QACardProps {
 }
 
 const QACard = forwardRef<HTMLDivElement, QACardProps>(({ item, clusterTitle, onOpenModal, onDelete, animationState, isOverlay, ...props }, ref) => {
+  console.groupCollapsed(`[DEBUG] Rendering QACard ${item._id}`);
+  console.log('Full Q/A item:', item);
+  console.log('Cluster:', clusterTitle);
+  console.groupEnd();
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item._id,
     data: {

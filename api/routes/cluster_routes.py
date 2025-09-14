@@ -88,51 +88,82 @@ async def move_qa_to_cluster(
     """
     move_qa_to_cluster(cluster_list_id, qa_id, new_cluster_title) -> moves a Q/A to a new cluster.
     """
+    print(f"[DEBUG] move_qa_to_cluster called with: cluster_list_id={cluster_list_id}, qa_id={qa_id}, payload={payload}")
+    
     new_cluster_title = payload.new_cluster_title.strip()
     if not new_cluster_title:
-        raise HTTPException(status_code=400, detail="new_cluster_title must be non-empty")
+        error_msg = "new_cluster_title must be non-empty"
+        print(f"[ERROR] {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
 
     # Get cluster list
+    print(f"[DEBUG] Looking up cluster list with ID: {cluster_list_id}")
     db_cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    print(f"[DEBUG] Found cluster list: {db_cluster_list}")
+    
     if not db_cluster_list:
-        raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
+        error_msg = f"ClusterList with id '{cluster_list_id}' not found."
+        print(f"[ERROR] {error_msg}")
+        raise HTTPException(status_code=404, detail=error_msg)
 
     # Get Q&A pair
+    print(f"[DEBUG] Looking up Q/A pair with ID: {qa_id}")
     qa_pair = db_service.get_qa_pair_by_id(qa_id)
+    print(f"[DEBUG] Found Q/A pair: {qa_pair}")
+    
     if not qa_pair:
-        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found.")
+        error_msg = f"Q/A with id '{qa_id}' not found."
+        print(f"[ERROR] {error_msg}")
+        raise HTTPException(status_code=404, detail=error_msg)
 
     # Get old cluster title
     old_cluster_title = qa_pair.cluster.title if qa_pair.cluster else ""
+    print(f"[DEBUG] Current cluster for Q/A: {old_cluster_title}")
 
     # Get destination cluster
+    print(f"[DEBUG] Looking up destination cluster with title: {new_cluster_title}")
     dest_cluster = db_service.get_cluster_by_title(db_cluster_list.id, new_cluster_title)
+    print(f"[DEBUG] Found destination cluster: {dest_cluster}")
+    
     if not dest_cluster:
-        raise HTTPException(status_code=404, detail=f"Destination cluster '{new_cluster_title}' not found.")
+        error_msg = f"Destination cluster '{new_cluster_title}' not found in list '{cluster_list_id}'."
+        print(f"[ERROR] {error_msg}")
+        raise HTTPException(status_code=404, detail=error_msg)
 
     # If source and destination are the same, do nothing
     if qa_pair.cluster_id == dest_cluster.id:
+        msg = "Source and destination clusters are the same. No action taken."
+        print(f"[INFO] {msg}")
         return MoveQAResponse(
-            message="Source and destination clusters are the same. No action taken.",
+            message=msg,
             qa_id=qa_id,
             old_cluster_title=old_cluster_title,
             new_cluster_title=new_cluster_title
         )
 
+    print(f"[DEBUG] Moving Q/A from cluster ID {qa_pair.cluster_id} to {dest_cluster.id}")
+    
     # Move the Q&A pair
     db_service.move_qa_pair(qa_pair, dest_cluster)
+    print("[DEBUG] Successfully moved Q/A pair in database")
 
     # Broadcast the update
     if manager and manager.is_ready():
+        print("[DEBUG] Broadcasting update to connected clients")
         await manager.broadcast({
             "type": "cluster_list_update",
             "payload": {
                 "list_id": cluster_list_id
             }
         })
+    else:
+        print("[WARNING] Manager not ready, skipping broadcast")
 
+    msg = f"Moved Q/A from '{old_cluster_title}' to '{new_cluster_title}'."
+    print(f"[INFO] {msg}")
+    
     return MoveQAResponse(
-        message=f"Moved Q/A from '{old_cluster_title}' to '{new_cluster_title}'.",
+        message=msg,
         qa_id=qa_id,
         old_cluster_title=old_cluster_title,
         new_cluster_title=new_cluster_title
