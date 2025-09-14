@@ -37,9 +37,16 @@ class DatabaseService:
         return [ClusterListInfo(id=cl.list_id, title=cl.title) for cl in cluster_lists]
     
     # Cluster operations
-    def create_cluster(self, cluster_list_id: int, title: str) -> ClusterDB:
+    def create_cluster(self, cluster_list_uuid: str, title: str) -> ClusterDB:
         """Create a new cluster"""
-        cluster = ClusterDB(title=title, cluster_list_id=cluster_list_id)
+        # First get the cluster list by its UUID to get the integer ID
+        cluster_list = self.session.exec(
+            select(ClusterListDB).where(ClusterListDB.list_id == cluster_list_uuid)
+        ).first()
+        if not cluster_list:
+            raise ValueError(f"Cluster list with UUID {cluster_list_uuid} not found")
+            
+        cluster = ClusterDB(title=title, cluster_list_id=cluster_list.id)
         self.session.add(cluster)
         self.session.commit()
         self.session.refresh(cluster)
