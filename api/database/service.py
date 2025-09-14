@@ -21,10 +21,16 @@ class DatabaseService:
     
     def get_cluster_list_by_id(self, list_id: str) -> Optional[ClusterListDB]:
         """Get cluster list by UUID string ID"""
-        # Get by list_id (UUID string)
-        return self.session.exec(
-            select(ClusterListDB).where(ClusterListDB.list_id == list_id)
-        ).first()
+        try:
+            from uuid import UUID
+            # Ensure the input is a valid UUID string
+            uuid_obj = UUID(str(list_id))
+            # Convert back to string to ensure proper comparison
+            return self.session.exec(
+                select(ClusterListDB).where(ClusterListDB.list_id == str(uuid_obj))
+            ).first()
+        except (ValueError, AttributeError):
+            return None
     
     def get_all_cluster_lists(self) -> List[ClusterListDB]:
         """Get all cluster lists"""
@@ -54,19 +60,25 @@ class DatabaseService:
     
     def get_cluster_by_title(self, cluster_list_uuid: str, title: str) -> Optional[ClusterDB]:
         """Get cluster by title (case insensitive)"""
-        # First get the cluster list by its UUID to get the integer ID
-        cluster_list = self.session.exec(
-            select(ClusterListDB).where(ClusterListDB.list_id == cluster_list_uuid)
-        ).first()
-        if not cluster_list:
+        try:
+            from uuid import UUID
+            # Ensure the input is a valid UUID string
+            uuid_obj = UUID(str(cluster_list_uuid))
+            # First get the cluster list by its UUID to get the integer ID
+            cluster_list = self.session.exec(
+                select(ClusterListDB).where(ClusterListDB.list_id == str(uuid_obj))
+            ).first()
+            if not cluster_list:
+                return None
+                
+            # Then find the cluster by title and the integer cluster_list_id
+            statement = select(ClusterDB).where(
+                ClusterDB.cluster_list_id == cluster_list.id,
+                ClusterDB.title.ilike(title.strip())
+            )
+            return self.session.exec(statement).first()
+        except (ValueError, AttributeError):
             return None
-            
-        # Then find the cluster by title and the integer cluster_list_id
-        statement = select(ClusterDB).where(
-            ClusterDB.cluster_list_id == cluster_list.id,
-            ClusterDB.title.ilike(title.strip())
-        )
-        return self.session.exec(statement).first()
     
     def delete_cluster(self, cluster: ClusterDB) -> None:
         """Delete a cluster and all its QAs"""
