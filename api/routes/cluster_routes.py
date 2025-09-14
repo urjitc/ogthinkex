@@ -6,7 +6,7 @@ from models import (
     ClusterList, ClusterListInfo, CreateClusterListRequest,
     AddQARequest, AddQAResponse, UpdateQARequest, UpdateQAResponse,
     MoveQARequest, MoveQAResponse, ReorderQAsRequest,
-    DeleteQAResponse, DeleteClusterResponse
+    DeleteQAResponse, DeleteClusterResponse, CreateQARequest
 )
 from services.ably_manager import AblyManager
 from fastapi import Query
@@ -86,7 +86,7 @@ def get_cluster_list_by_id(
     operation_id="move_qa_to_cluster",
 )
 async def move_qa_to_cluster(
-    cluster_list_id: str, 
+    cluster_list_id: int, 
     qa_id: str, 
     payload: MoveQARequest,
     db_service: DatabaseService = Depends(get_database_service)
@@ -108,9 +108,14 @@ async def move_qa_to_cluster(
     if not current_cluster:
         raise HTTPException(status_code=404, detail="Current cluster not found")
 
+    # Get cluster list to convert ID
+    cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    if not cluster_list:
+        raise HTTPException(status_code=404, detail=f"Cluster list with id '{cluster_list_id}' not found")
+
     # Get new cluster
     new_cluster = db_service.get_cluster_by_title(
-        cluster_list_id=cluster_list_id,
+        cluster_list_id=cluster_list.id,  # Use integer ID here
         title=new_cluster_title
     )
     if not new_cluster:
@@ -198,7 +203,7 @@ async def update_qa(
     if not payload.cluster_list_id:
         raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
 
-    # Get cluster list
+    # Get cluster list to convert ID
     db_cluster_list = db_service.get_cluster_list_by_id(payload.cluster_list_id)
     if not db_cluster_list:
         raise HTTPException(status_code=404, detail=f"ClusterList with id '{payload.cluster_list_id}' not found.")
@@ -211,8 +216,11 @@ async def update_qa(
     if payload.question is None and payload.answer is None:
         raise HTTPException(status_code=400, detail="At least one of 'question' or 'answer' must be provided for an update.")
 
-    # Get cluster
-    cluster = db_service.get_cluster_by_title(db_cluster_list.id, cluster_name)
+    # Get cluster with integer ID
+    cluster = db_service.get_cluster_by_title(
+        cluster_list_id=db_cluster_list.id,
+        title=cluster_name
+    )
     if not cluster:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found in list '{payload.cluster_list_id}'.")
 
@@ -408,15 +416,23 @@ async def delete_cluster(
     operation_id="delete_qa_from_cluster",
 )
 async def delete_qa_from_cluster(
-    cluster_list_id: str,
+    cluster_list_id: int,
     qa_id: str,
     cluster_name: str = Query(..., alias="clusterName"),
     db_service: DatabaseService = Depends(get_database_service),
     manager: AblyManager = Depends(get_ably_manager),
 ):
     """Delete a Q&A pair from a cluster"""
+    # Get cluster list to convert ID
+    cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    if not cluster_list:
+        raise HTTPException(status_code=404, detail=f"Cluster list with id '{cluster_list_id}' not found")
+
     # Get the cluster
-    cluster = db_service.get_cluster_by_title(cluster_list_id, cluster_name)
+    cluster = db_service.get_cluster_by_title(
+        cluster_list_id=cluster_list.id,  # Use integer ID here
+        title=cluster_name
+    )
     if not cluster:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found")
 
@@ -452,4 +468,52 @@ async def delete_qa_from_cluster(
     return DeleteQAResponse(
         success=True,
         message=f"Q/A pair {qa_id} deleted from cluster {cluster_name}",
+    )
+
+
+@router.post("/create_qa", response_model=AddQAResponse, operation_id="create_qa")
+async def create_qa(
+    payload: CreateQARequest,
+    db_service: DatabaseService = Depends(get_database_service),
+    manager: AblyManager = Depends(get_ably_manager),
+):
+    """Create a new Q&A pair in the specified cluster"""
+    if not payload.cluster_list_id:
+        raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
+
+    # Get cluster list to convert ID
+    db_cluster_list = db_service.get_cluster_list_by_id(payload.cluster_list_id)
+    if not db_cluster_list:
+        raise HTTPException(status_code=404, detail=f"ClusterList with id '{payload.cluster_list_id}' not found.")
+
+    cluster_name = payload.clusterName.strip()
+    if not cluster_name:
+        raise HTTPException(status_code=400, detail="clusterName must be non-empty")
+
+    # Get or create cluster
+    cluster = db_service.get_cluster_by_title(
+        cluster_list_id=db_cluster_list.id,  # Use integer ID here
+        title=cluster_name
+    )
+    if not cluster:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found.")
+
+    # Create Q&A pair
+    qa_pair = db_service.create_qa_pair(cluster.id, payload.question, payload.answer)
+
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": payload.cluster_list_id
+            }
+        })
+
+    # Convert cluster to API model
+    api_cluster = db_service.convert_to_api_cluster(cluster)
+    
+    return AddQAResponse(
+        message=f'Added Q/A to cluster "{cluster.title}".',
+        cluster=api_cluster
     )
