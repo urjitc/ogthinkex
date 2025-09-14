@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ClusterList } from '../components/ClusterList/ClusterListWithWebSocket';
-import { API_BASE_URL } from '../config';
+import { PUBLIC_API_BASE_URL } from '../config';
 
 const fetchAllClusterLists = async (): Promise<ClusterList[]> => {
-  const response = await fetch(`${API_BASE_URL}/cluster-lists`, {
+  const response = await fetch(`${PUBLIC_API_BASE_URL}/cluster-lists`, {
     headers: {
       'ngrok-skip-browser-warning': 'true',
     },
