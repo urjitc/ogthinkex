@@ -21,8 +21,16 @@ class DatabaseService:
     
     def get_cluster_list_by_id(self, list_id: str) -> Optional[ClusterListDB]:
         """Get cluster list by ID"""
-        statement = select(ClusterListDB).where(ClusterListDB.list_id == list_id)
-        return self.session.exec(statement).first()
+        # First try to get by list_id (UUID string)
+        cluster_list = self.session.exec(
+            select(ClusterListDB).where(ClusterListDB.list_id == list_id)
+        ).first()
+        
+        # If not found by list_id, try by id (integer) for backward compatibility
+        if not cluster_list and list_id.isdigit():
+            cluster_list = self.session.get(ClusterListDB, int(list_id))
+            
+        return cluster_list
     
     def get_all_cluster_lists(self) -> List[ClusterListDB]:
         """Get all cluster lists"""
