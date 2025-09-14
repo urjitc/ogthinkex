@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import type { Cluster, QAPair } from './ClusterListWithWebSocket';
 import QACard from './QACard';
 
@@ -71,6 +72,9 @@ const getStatusColor = (title: string, columnIndex: number) => {
 };
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onDeleteQA, onDeleteCluster, isAnimated, columnIndex, animatedItems }) => {
+  const { setNodeRef } = useDroppable({
+    id: cluster.title,
+  });
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -109,7 +113,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onD
           background-color: rgba(156, 163, 175, 0.5);
         }
       `}</style>
-      <div 
+            <div 
+        ref={setNodeRef}
         id={`cluster-${cluster.title}`} 
         className={`w-80 flex-shrink-0 rounded-lg border ${statusColors} flex flex-col max-h-full ${isAnimated ? 'animate-glow' : ''}`}
       >
@@ -155,9 +160,10 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onD
         {/* Cards Container */}
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
           {cluster.qas.map(qa => (
-            <QACard 
+                        <QACard 
               key={qa._id} 
               item={qa} 
+              clusterTitle={cluster.title}
               onOpenModal={() => onOpenQAModal(qa)}
               onDelete={() => onDeleteQA(qa._id, cluster.title)}
               animationState={animatedItems[qa._id] as 'new' | 'updated' | undefined}

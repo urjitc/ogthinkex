@@ -54,6 +54,15 @@ class ClusterListInfo(BaseModel):
     id: str
     title: str
 
+class MoveQARequest(BaseModel):
+    new_cluster_title: str
+
+class MoveQAResponse(BaseModel):
+    message: str
+    qa_id: str
+    old_cluster_title: str
+    new_cluster_title: str
+
 # -----------------------------
 # 2) App + CORS
 # -----------------------------
@@ -472,6 +481,78 @@ def get_cluster_list_by_id(cluster_list_id: str):
         if cluster_list_id not in CLUSTER_LISTS:
             raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
         return CLUSTER_LISTS[cluster_list_id]
+
+@app.patch(
+    "/cluster-lists/{cluster_list_id}/qa/{qa_id}/move",
+    response_model=MoveQAResponse,
+    operation_id="move_qa_to_cluster",
+)
+async def move_qa_to_cluster(cluster_list_id: str, qa_id: str, payload: MoveQARequest):
+    """
+    move_qa_to_cluster(cluster_list_id, qa_id, new_cluster_title) -> moves a Q/A to a new cluster.
+    """
+    new_cluster_title = payload.new_cluster_title.strip()
+    if not new_cluster_title:
+        raise HTTPException(status_code=400, detail="new_cluster_title must be non-empty")
+
+    with lock:
+        if cluster_list_id not in CLUSTER_LISTS:
+            raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
+        
+        cluster_list = CLUSTER_LISTS[cluster_list_id]
+
+        source_cluster_idx = -1
+        qa_to_move_idx = -1
+        qa_to_move = None
+        old_cluster_title = ""
+
+        # Find the QA pair and its source cluster
+        for i, c in enumerate(cluster_list.clusters):
+            for j, qa in enumerate(c.qas):
+                if qa.qa_id == qa_id:
+                    qa_to_move = qa
+                    qa_to_move_idx = j
+                    source_cluster_idx = i
+                    old_cluster_title = c.title
+                    break
+            if qa_to_move:
+                break
+        
+        if not qa_to_move:
+            raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found in any cluster.")
+
+        # Find the destination cluster
+        dest_cluster_idx = _find_cluster_idx_case_insensitive(cluster_list, new_cluster_title)
+        if dest_cluster_idx is None:
+            raise HTTPException(status_code=404, detail=f"Destination cluster '{new_cluster_title}' not found.")
+
+        # If source and destination are the same, do nothing
+        if source_cluster_idx == dest_cluster_idx:
+            return MoveQAResponse(
+                message="Source and destination clusters are the same. No action taken.",
+                qa_id=qa_id,
+                old_cluster_title=old_cluster_title,
+                new_cluster_title=new_cluster_title
+            )
+
+        # Move the item
+        del cluster_list.clusters[source_cluster_idx].qas[qa_to_move_idx]
+        cluster_list.clusters[dest_cluster_idx].qas.append(qa_to_move)
+
+        # Broadcast the update
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": cluster_list.id
+            }
+        })
+
+        return MoveQAResponse(
+            message=f"Moved Q/A from '{old_cluster_title}' to '{new_cluster_title}'.",
+            qa_id=qa_id,
+            old_cluster_title=old_cluster_title,
+            new_cluster_title=new_cluster_title
+        )
 
 # For backward compatibility with the current frontend, which expects /clusters
 @app.get(
