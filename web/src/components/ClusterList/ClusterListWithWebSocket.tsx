@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import Sidebar from './Sidebar';
 import BreadcrumbBar from './BreadcrumbBar';
@@ -101,6 +101,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const { isConnected } = useWebSocket();
   const { data: allClusterLists, isLoading: areListsLoading } = useAllClusterLists();
   const [selectedListId, setSelectedListId] = useState<string | null>(initialListId || null);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -125,11 +126,26 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     }
   }, [allClusterLists, selectedListId]);
 
-  const { data: clusterData, isLoading, error } = useQuery({
+  // Handle list selection with transition state
+  const handleListSelection = useCallback((listId: string) => {
+    if (listId === selectedListId) return;
+    
+    setIsTransitioning(true);
+    setSelectedListId(listId);
+    
+    // Reset transition state after a short delay
+    setTimeout(() => {
+      setIsTransitioning(false);
+    }, 300);
+  }, [selectedListId]);
+
+  const { data: clusterData, isLoading, error, isFetching } = useQuery({
     queryKey: ['clusterList', selectedListId],
     queryFn: () => fetchClusterList(selectedListId),
     enabled: !!selectedListId, // Only run if a list is selected
-    placeholderData: keepPreviousData,
+    // Remove keepPreviousData to prevent showing old data
+    staleTime: 30000, // Data is fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   useEffect(() => {
@@ -333,14 +349,23 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         return null;
       })
       .filter((cluster): cluster is Cluster => cluster !== null);
-    }, [displayData, searchQuery]);
+  }, [displayData, searchQuery]);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !isFetching) {
       // Enable animations only after the initial data has loaded.
       setAnimationsEnabled(true);
     }
-  }, [isLoading]);
+  }, [isLoading, isFetching]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (animationTimerRef.current) {
+        clearTimeout(animationTimerRef.current);
+      }
+    };
+  }, []);
 
   // Effect for scrolling to a selected cluster from the sidebar
   useEffect(() => {
@@ -600,7 +625,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         sidebarCollapsed={sidebarCollapsed}
         onToggleNode={toggleNodeExpanded}
         onSelectNode={selectNode}
-        onSelectList={setSelectedListId}
+        onSelectList={handleListSelection}
         onSearchChange={setSearchQuery}
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         onDeleteList={handleDeleteClusterList}
@@ -618,31 +643,40 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
         {/* Kanban Board */}
         <div className="flex-1 flex flex-col min-h-0 pt-3 pb-2 bg-zinc-950/50 relative">
-          <div
-            ref={scrollContainerRef}
-            className="h-full overflow-x-auto scrollbar-hide"
-            style={{ scrollPaddingLeft: '1.5rem' }}
-            onScroll={updateScrollbar}
-          >
-            <div className="flex gap-6 h-full px-6 pb-3">
-              {filteredClusters.map((cluster, index) => {
-                console.log('Rendering cluster:', cluster.title, 'with', cluster.qas.length, 'QAs');
-                return (
-                  <KanbanColumn 
-                    key={cluster.title} 
-                    cluster={cluster} 
-                    onOpenQAModal={openQAModal}
-                    onDeleteQA={handleDeleteQA}
-                    onDeleteCluster={handleDeleteCluster}
-                    isAnimated={animatedNodeId === cluster.title}
-                    columnIndex={index}
-                    animatedItems={animatedItems}
-                  />
-                );
-              })}
-              <div className="flex-shrink-0 w-px" />
+          {isLoading || isFetching || isTransitioning ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center space-x-2 text-gray-400">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span>Loading cluster list...</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div
+              ref={scrollContainerRef}
+              className="h-full overflow-x-auto scrollbar-hide"
+              style={{ scrollPaddingLeft: '1.5rem' }}
+              onScroll={updateScrollbar}
+            >
+              <div className="flex gap-6 h-full px-6 pb-3">
+                {filteredClusters.map((cluster, index) => {
+                  console.log('Rendering cluster:', cluster.title, 'with', cluster.qas.length, 'QAs');
+                  return (
+                    <KanbanColumn 
+                      key={`${cluster.title}-${selectedListId}`} 
+                      cluster={cluster} 
+                      onOpenQAModal={openQAModal}
+                      onDeleteQA={handleDeleteQA}
+                      onDeleteCluster={handleDeleteCluster}
+                      isAnimated={animatedNodeId === cluster.title}
+                      columnIndex={index}
+                      animatedItems={animatedItems}
+                    />
+                  );
+                })}
+                <div className="flex-shrink-0 w-px" />
+              </div>
+            </div>
+          )}
           
           {/* Custom Always-Visible Scrollbar */}
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-800 rounded-full">

@@ -74,7 +74,7 @@ const getStatusColor = (title: string, columnIndex: number) => {
   return colors[colorIndex];
 };
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onDeleteQA, onDeleteCluster, isAnimated, columnIndex, animatedItems }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({ cluster, onOpenQAModal, onDeleteQA, onDeleteCluster, isAnimated, columnIndex, animatedItems }) => {
   const { setNodeRef } = useDroppable({
     id: cluster.title,
   });
@@ -194,6 +194,6 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onD
       </div>
     </>
   );
-};
+});
 
 export default KanbanColumn;
