@@ -15,6 +15,7 @@ interface SidebarProps {
   onSelectList: (listId: string) => void;
   onSearchChange: (query: string) => void;
   onToggleSidebar: () => void;
+  onDeleteList?: (listId: string, listName: string) => void;
 }
 
 const TreeNodeComponent: React.FC<{
@@ -27,7 +28,8 @@ const TreeNodeComponent: React.FC<{
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
   onSelectList: (listId: string) => void;
-}> = ({ node, level, expandedNodes, selectedNodeId, selectedListId, onToggle, onSelect, onSelectList, animatedNodeId }) => {
+  onDeleteList?: (listId: string, listName: string) => void;
+}> = ({ node, level, expandedNodes, selectedNodeId, selectedListId, onToggle, onSelect, onSelectList, onDeleteList, animatedNodeId }) => {
   const hasChildren = node.children.length > 0;
   const expanded = expandedNodes.has(node.id);
   const isListSelected = selectedListId === node.id;
@@ -44,6 +46,13 @@ const TreeNodeComponent: React.FC<{
     }
   };
 
+  const handleRightClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (node.type === 'topic' && onDeleteList) {
+      onDeleteList(node.id, node.name);
+    }
+  };
+
   return (
     <div>
       <div
@@ -54,6 +63,7 @@ const TreeNodeComponent: React.FC<{
         }`}
         style={{ paddingLeft: `${level * 24 + 8}px` }}
         onClick={handleClick}
+        onContextMenu={handleRightClick}
       >
         {(hasChildren || (node.type === 'topic' && level === 0)) && (
           <button
@@ -108,6 +118,7 @@ const TreeNodeComponent: React.FC<{
               onToggle={onToggle}
               onSelect={onSelect}
               onSelectList={onSelectList}
+              onDeleteList={onDeleteList}
             />
           ))}
         </div>
@@ -129,6 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectList,
   onSearchChange,
   onToggleSidebar,
+  onDeleteList,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -269,6 +281,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onToggle={onToggleNode}
               onSelect={onSelectNode}
               onSelectList={onSelectList}
+              onDeleteList={onDeleteList}
             />
           ))}
         </div>

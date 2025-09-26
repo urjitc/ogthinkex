@@ -101,6 +101,11 @@ class DatabaseService:
         self.session.delete(cluster)
         self.session.commit()
     
+    def delete_cluster_list(self, cluster_list: ClusterListDB) -> None:
+        """Delete a cluster list and all its clusters and QAs"""
+        self.session.delete(cluster_list)
+        self.session.commit()
+    
     # QAPair operations
     def create_qa_pair(self, cluster_id: int, question: str, answer: str) -> QAPairDB:
         """Create a new Q&A pair"""

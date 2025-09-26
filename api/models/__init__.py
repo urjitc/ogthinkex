@@ -3,7 +3,7 @@ from .api_models import (
     QAPair, Cluster, ClusterList, AddQARequest, AddQAResponse,
     UpdateQARequest, UpdateQAResponse, ClusterListInfo, MoveQARequest,
     MoveQAResponse, ReorderQAsRequest, CreateClusterListRequest,
-    DeleteQAResponse, DeleteClusterResponse
+    DeleteQAResponse, DeleteClusterResponse, DeleteClusterListResponse
 )
 
 __all__ = [
@@ -13,5 +13,5 @@ __all__ = [
     "QAPair", "Cluster", "ClusterList", "AddQARequest", "AddQAResponse",
     "UpdateQARequest", "UpdateQAResponse", "ClusterListInfo", "MoveQARequest",
     "MoveQAResponse", "ReorderQAsRequest", "CreateClusterListRequest",
-    "DeleteQAResponse", "DeleteClusterResponse"
+    "DeleteQAResponse", "DeleteClusterResponse", "DeleteClusterListResponse"
 ]

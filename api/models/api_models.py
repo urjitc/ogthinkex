@@ -84,3 +84,9 @@ class DeleteQAResponse(BaseModel):
 class DeleteClusterResponse(BaseModel):
     message: str
     clusterName: str
+
+
+class DeleteClusterListResponse(BaseModel):
+    message: str
+    clusterListId: str
+    clusterListTitle: str

@@ -3,6 +3,9 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Cluster, QAPair } from './ClusterListWithWebSocket';
 import QACard from './QACard';
+import ResearchCard from './ResearchCard';
+import SourceNoteCard from './SourceNoteCard';
+import FlashcardCard from './FlashcardCard';
 
 import { useState, useRef, useEffect } from 'react';
 
@@ -165,8 +168,18 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ cluster, onOpenQAModal, onD
               console.log('Full QA data:', qa);
               console.groupEnd();
               
+              // Use appropriate card component based on type
+              let CardComponent = QACard;
+              if (qa.card_type === 'research') {
+                CardComponent = ResearchCard;
+              } else if (qa.card_type === 'source_note') {
+                CardComponent = SourceNoteCard;
+              } else if (qa.card_type === 'flashcard') {
+                CardComponent = FlashcardCard;
+              }
+              
               return (
-                <QACard 
+                <CardComponent 
                   key={qa._id} 
                   item={qa} 
                   clusterTitle={cluster.title}
