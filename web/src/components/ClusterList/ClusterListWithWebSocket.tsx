@@ -8,6 +8,7 @@ import MainPanel from './MainPanel';
 import QAModal from './QAModal';
 import ResearchModal from './ResearchModal';
 import FlashcardModal from './FlashcardModal';
+import SourceNoteModal from './SourceNoteModal';
 import QACard from './QACard';
 import ResearchCard from './ResearchCard';
 import SourceNoteCard from './SourceNoteCard';
@@ -101,7 +102,6 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const { isConnected } = useWebSocket();
   const { data: allClusterLists, isLoading: areListsLoading } = useAllClusterLists();
   const [selectedListId, setSelectedListId] = useState<string | null>(initialListId || null);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -112,9 +112,11 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [researchModalOpen, setResearchModalOpen] = useState<boolean>(false);
   const [flashcardModalOpen, setFlashcardModalOpen] = useState<boolean>(false);
+  const [sourceNoteModalOpen, setSourceNoteModalOpen] = useState<boolean>(false);
   const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
   const [selectedResearchItem, setSelectedResearchItem] = useState<QAPair | null>(null);
   const [selectedFlashcardItem, setSelectedFlashcardItem] = useState<QAPair | null>(null);
+  const [selectedSourceNoteItem, setSelectedSourceNoteItem] = useState<QAPair | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'qa' | 'cluster' | 'clusterList' } | null>(null);
   const [activeDragData, setActiveDragData] = useState<{ item: QAPair; clusterTitle: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -126,17 +128,11 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     }
   }, [allClusterLists, selectedListId]);
 
-  // Handle list selection with transition state
+  // Handle list selection
   const handleListSelection = useCallback((listId: string) => {
     if (listId === selectedListId) return;
     
-    setIsTransitioning(true);
     setSelectedListId(listId);
-    
-    // Reset transition state after a short delay
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 300);
   }, [selectedListId]);
 
   const { data: clusterData, isLoading, error, isFetching } = useQuery({
@@ -503,6 +499,9 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     } else if (qaItem.card_type === 'flashcard') {
       setSelectedFlashcardItem(qaItem);
       setFlashcardModalOpen(true);
+    } else if (qaItem.card_type === 'source_note') {
+      setSelectedSourceNoteItem(qaItem);
+      setSourceNoteModalOpen(true);
     } else {
       setSelectedQAItem(qaItem);
       setModalOpen(true);
@@ -522,6 +521,11 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const closeFlashcardModal = () => {
     setFlashcardModalOpen(false);
     setSelectedFlashcardItem(null);
+  };
+
+  const closeSourceNoteModal = () => {
+    setSourceNoteModalOpen(false);
+    setSelectedSourceNoteItem(null);
   };
 
 
@@ -643,7 +647,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
         {/* Kanban Board */}
         <div className="flex-1 flex flex-col min-h-0 pt-3 pb-2 bg-zinc-950/50 relative">
-          {isLoading || isFetching || isTransitioning ? (
+          {isLoading || isFetching ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex items-center space-x-2 text-gray-400">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -705,6 +709,13 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         isOpen={flashcardModalOpen}
         flashcardItem={selectedFlashcardItem}
         onClose={closeFlashcardModal}
+      />
+
+      {/* Source Note Modal */}
+      <SourceNoteModal
+        isOpen={sourceNoteModalOpen}
+        sourceNoteItem={selectedSourceNoteItem}
+        onClose={closeSourceNoteModal}
       />
 
       <DragOverlay

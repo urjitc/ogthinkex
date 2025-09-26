@@ -655,7 +655,7 @@ async def edit_source_note(
     cluster_name = payload.cluster_name.strip()
     if not cluster_name:
         raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
-    if not payload.source_note_id:
+    if not source_note_id:
         raise HTTPException(status_code=400, detail="source_note_id must be non-empty")
     if payload.source_metadata is None and payload.source_content is None:
         raise HTTPException(status_code=400, detail="At least one of 'source_metadata' or 'source_content' must be provided for an update.")
@@ -666,9 +666,9 @@ async def edit_source_note(
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found in list '{payload.cluster_list_id}'.")
 
     # Get source note
-    source_note = db_service.get_source_note_by_id(payload.source_note_id)
+    source_note = db_service.get_source_note_by_id(source_note_id)
     if not source_note or source_note.cluster_id != cluster.id:
-        raise HTTPException(status_code=404, detail=f"Source note with id '{payload.source_note_id}' not found in cluster '{cluster_name}'.")
+        raise HTTPException(status_code=404, detail=f"Source note with id '{source_note_id}' not found in cluster '{cluster_name}'.")
 
     # Update the source note
     updated_source_note = db_service.update_source_note(source_note, payload.source_metadata, payload.source_content)
