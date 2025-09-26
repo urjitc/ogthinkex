@@ -282,24 +282,13 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
       name: list.title,
       type: 'topic' as const,
       children: (list.id === selectedListId && clusterData)
-        ? [
-            // Always include Research cluster first
-            {
-              id: 'Research',
-              name: 'Research',
-              type: 'subtopic' as const,
-              children: [],
-              nodeIds: [],
-            },
-            // Then include other clusters
-            ...clusterData.clusters.map(cluster => ({
+        ? clusterData.clusters.map(cluster => ({
               id: cluster.title, // Keep using title for cluster ID within the sidebar
               name: cluster.title,
               type: 'subtopic' as const,
               children: [],
               nodeIds: [], // This can be populated if needed later
             }))
-          ]
         : [],
       nodeIds: [],
     }));
