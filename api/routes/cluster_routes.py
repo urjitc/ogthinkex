@@ -6,7 +6,9 @@ from models import (
     ClusterList, ClusterListInfo, CreateClusterListRequest,
     AddQARequest, AddQAResponse, UpdateQARequest, UpdateQAResponse,
     MoveQARequest, MoveQAResponse, ReorderQAsRequest,
-    DeleteQAResponse, DeleteClusterResponse, DeleteClusterListResponse
+    DeleteQAResponse, DeleteClusterResponse, DeleteClusterListResponse,
+    SourceNote, AddSourceNoteRequest, AddSourceNoteResponse, UpdateSourceNoteRequest, UpdateSourceNoteResponse,
+    DeleteSourceNoteResponse
 )
 from services.ably_manager import AblyManager
 from fastapi import Query
@@ -518,23 +520,208 @@ async def delete_qa_from_cluster(
     db_service: DatabaseService = Depends(get_database_service),
     manager: AblyManager = Depends(get_ably_manager),
 ):
-    """Delete a Q&A pair from a cluster"""
+    """Delete a Q&A pair or source note from a cluster"""
     # Get the cluster
     cluster = db_service.get_cluster_by_title(cluster_list_id, cluster_name)
     if not cluster:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found")
 
-    # Get the Q&A pair
+    # First try to find as a Q&A pair
     qa_pair = db_service.get_qa_pair_by_id(qa_id)
-    if not qa_pair:
-        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found")
+    if qa_pair and qa_pair in cluster.qas:
+        # Delete the Q&A pair
+        db_service.delete_qa_pair(qa_pair)
+        
+        # Broadcast the update
+        if manager and manager.is_ready():
+            await manager.broadcast({
+                "type": "cluster_list_update",
+                "payload": {
+                    "list_id": cluster_list_id
+                }
+            })
 
-    # Verify the Q&A pair is in the cluster
-    if qa_pair not in cluster.qas:
-        raise HTTPException(status_code=404, detail=f"Q/A with id '{qa_id}' not found in cluster '{cluster_name}'.")
+        return DeleteQAResponse(
+            message=f"Q/A pair {qa_id} deleted from cluster {cluster_name}",
+            qa_id=qa_id,
+            clusterName=cluster_name
+        )
+    
+    # If not found as Q&A pair, try as source note
+    source_note = db_service.get_source_note_by_id(qa_id)
+    if source_note and source_note in cluster.source_notes:
+        # Delete the source note
+        db_service.delete_source_note(source_note)
+        
+        # Broadcast the update
+        if manager and manager.is_ready():
+            await manager.broadcast({
+                "type": "cluster_list_update",
+                "payload": {
+                    "list_id": cluster_list_id
+                }
+            })
 
-    # Delete the Q&A pair
-    db_service.delete_qa_pair(qa_pair)
+        return DeleteQAResponse(
+            message=f"Source note {qa_id} deleted from cluster {cluster_name}",
+            qa_id=qa_id,
+            clusterName=cluster_name
+        )
+    
+    # If neither found
+    raise HTTPException(status_code=404, detail=f"Item with id '{qa_id}' not found in cluster '{cluster_name}'.")
+
+
+# Source Note Routes
+@router.get("/source-notes/{source_note_id}", response_model=SourceNote, operation_id="get_source_note")
+async def get_source_note(
+    source_note_id: str,
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Get a source note by ID.
+    """
+    source_note = db_service.get_source_note_by_id(source_note_id)
+    if not source_note:
+        raise HTTPException(status_code=404, detail=f"Source note with id '{source_note_id}' not found.")
+    
+    return db_service.convert_to_api_source_note(source_note)
+
+
+@router.post("/source-notes", response_model=AddSourceNoteResponse, operation_id="create_source_note")
+async def create_source_note(
+    payload: AddSourceNoteRequest,
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Create a source note in a cluster. Creates cluster if it doesn't exist.
+    """
+    if not payload.cluster_list_id:
+        raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
+
+    # Get cluster list
+    db_cluster_list = db_service.get_cluster_list_by_id(payload.cluster_list_id)
+    if not db_cluster_list:
+        raise HTTPException(status_code=404, detail=f"ClusterList with id '{payload.cluster_list_id}' not found.")
+
+    cluster_name = payload.cluster_name.strip()
+    if not cluster_name:
+        raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
+
+    # Get or create cluster
+    cluster = db_service.get_cluster_by_title(payload.cluster_list_id, cluster_name)
+    if not cluster:
+        # Create new cluster using the UUID string
+        cluster = db_service.create_cluster(payload.cluster_list_id, cluster_name)
+
+    # Create source note
+    source_note = db_service.create_source_note(cluster.id, payload.source_metadata, payload.source_content)
+
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": payload.cluster_list_id
+            }
+        })
+
+    # Convert source note to API model
+    api_source_note = db_service.convert_to_api_source_note(source_note)
+    
+    return AddSourceNoteResponse(
+        message=f'Added source note to cluster "{cluster.title}".',
+        source_note=api_source_note
+    )
+
+
+@router.put("/source-notes/{source_note_id}", response_model=UpdateSourceNoteResponse, operation_id="edit_source_note")
+async def edit_source_note(
+    source_note_id: str,
+    payload: UpdateSourceNoteRequest,
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Edit a source note. Updates metadata and/or content.
+    """
+    if not payload.cluster_list_id:
+        raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
+
+    # Get cluster list
+    db_cluster_list = db_service.get_cluster_list_by_id(payload.cluster_list_id)
+    if not db_cluster_list:
+        raise HTTPException(status_code=404, detail=f"ClusterList with id '{payload.cluster_list_id}' not found.")
+
+    cluster_name = payload.cluster_name.strip()
+    if not cluster_name:
+        raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
+    if not payload.source_note_id:
+        raise HTTPException(status_code=400, detail="source_note_id must be non-empty")
+    if payload.source_metadata is None and payload.source_content is None:
+        raise HTTPException(status_code=400, detail="At least one of 'source_metadata' or 'source_content' must be provided for an update.")
+
+    # Get cluster
+    cluster = db_service.get_cluster_by_title(db_cluster_list.id, cluster_name)
+    if not cluster:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name}' not found in list '{payload.cluster_list_id}'.")
+
+    # Get source note
+    source_note = db_service.get_source_note_by_id(payload.source_note_id)
+    if not source_note or source_note.cluster_id != cluster.id:
+        raise HTTPException(status_code=404, detail=f"Source note with id '{payload.source_note_id}' not found in cluster '{cluster_name}'.")
+
+    # Update the source note
+    updated_source_note = db_service.update_source_note(source_note, payload.source_metadata, payload.source_content)
+
+    # Broadcast the update
+    if manager and manager.is_ready():
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": payload.cluster_list_id
+            }
+        })
+
+    return UpdateSourceNoteResponse(
+        message=f'Updated source note in cluster "{cluster.title}".',
+        source_note=db_service.convert_to_api_source_note(updated_source_note)
+    )
+
+
+@router.delete("/source-notes/{source_note_id}", response_model=DeleteSourceNoteResponse, operation_id="remove_source_note")
+async def remove_source_note(
+    source_note_id: str,
+    cluster_name: str,
+    cluster_list_id: str,
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Remove a source note from a cluster.
+    """
+    if not cluster_list_id:
+        raise HTTPException(status_code=400, detail="cluster_list_id must be provided")
+
+    # Get cluster list
+    db_cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    if not db_cluster_list:
+        raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
+
+    cluster_name_stripped = cluster_name.strip()
+    if not cluster_name_stripped:
+        raise HTTPException(status_code=400, detail="cluster_name must be non-empty")
+
+    # Get cluster
+    cluster = db_service.get_cluster_by_title(db_cluster_list.id, cluster_name_stripped)
+    if not cluster:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster_name_stripped}' not found.")
+
+    # Get source note
+    source_note = db_service.get_source_note_by_id(source_note_id)
+    if not source_note or source_note.cluster_id != cluster.id:
+        raise HTTPException(status_code=404, detail=f"Source note with id '{source_note_id}' not found in cluster '{cluster_name_stripped}'.")
+
+    # Delete the source note
+    db_service.delete_source_note(source_note)
 
     # Broadcast the update
     if manager and manager.is_ready():
@@ -545,10 +732,10 @@ async def delete_qa_from_cluster(
             }
         })
 
-    return DeleteQAResponse(
-        message=f"Q/A pair {qa_id} deleted from cluster {cluster_name}",
-        qa_id=qa_id,
-        clusterName=cluster_name
+    return DeleteSourceNoteResponse(
+        message=f'Deleted source note from cluster "{cluster.title}".',
+        source_note_id=source_note_id,
+        cluster_name=cluster.title
     )
 
 

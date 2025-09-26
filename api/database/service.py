@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from typing import List, Optional
-from models.database_models import ClusterListDB, ClusterDB, QAPairDB
-from models.api_models import ClusterList, Cluster, QAPair, ClusterListInfo
+from models.database_models import ClusterListDB, ClusterDB, QAPairDB, SourceNoteDB
+from models.api_models import ClusterList, Cluster, QAPair, ClusterListInfo, SourceNote, SourceMetadata, SourceContent
 
 
 class DatabaseService:
@@ -168,9 +168,32 @@ class DatabaseService:
                     qa_id=db_qa.qa_id,
                     question=db_qa.question,
                     answer=db_qa.answer,
-                    created_at=db_qa.created_at.isoformat() + "Z"
+                    created_at=db_qa.created_at.isoformat() + "Z",
+                    card_type=db_qa.card_type or "qa"
                 )
                 qas.append(qa)
+            
+            # Add source notes as QAPair objects with card_type="source_note"
+            for db_source_note in db_cluster.source_notes:
+                source_metadata = None
+                if db_source_note.source_metadata:
+                    source_metadata = SourceMetadata(**db_source_note.source_metadata)
+                
+                source_content = None
+                if db_source_note.source_content:
+                    source_content = SourceContent(**db_source_note.source_content)
+                
+                source_qa = QAPair(
+                    _id=db_source_note.source_note_id,
+                    qa_id=db_source_note.source_note_id,
+                    question=source_metadata.title if source_metadata else "Source Note",
+                    answer=source_content.summary if source_content else "",
+                    created_at=db_source_note.created_at.isoformat() + "Z",
+                    card_type="source_note",
+                    source_metadata=source_metadata,
+                    source_content=source_content
+                )
+                qas.append(source_qa)
             
             cluster = Cluster(title=db_cluster.title, qas=qas)
             clusters.append(cluster)
@@ -190,9 +213,32 @@ class DatabaseService:
                 qa_id=db_qa.qa_id,
                 question=db_qa.question,
                 answer=db_qa.answer,
-                created_at=db_qa.created_at.isoformat() + "Z"
+                created_at=db_qa.created_at.isoformat() + "Z",
+                card_type=db_qa.card_type or "qa"
             )
             qas.append(qa)
+        
+        # Add source notes as QAPair objects with card_type="source_note"
+        for db_source_note in db_cluster.source_notes:
+            source_metadata = None
+            if db_source_note.source_metadata:
+                source_metadata = SourceMetadata(**db_source_note.source_metadata)
+            
+            source_content = None
+            if db_source_note.source_content:
+                source_content = SourceContent(**db_source_note.source_content)
+            
+            source_qa = QAPair(
+                _id=db_source_note.source_note_id,
+                qa_id=db_source_note.source_note_id,
+                question=source_metadata.title if source_metadata else "Source Note",
+                answer=source_content.summary if source_content else "",
+                created_at=db_source_note.created_at.isoformat() + "Z",
+                card_type="source_note",
+                source_metadata=source_metadata,
+                source_content=source_content
+            )
+            qas.append(source_qa)
         
         return Cluster(title=db_cluster.title, qas=qas)
     
@@ -203,5 +249,59 @@ class DatabaseService:
             qa_id=db_qa.qa_id,
             question=db_qa.question,
             answer=db_qa.answer,
-            created_at=db_qa.created_at.isoformat() + "Z"
+            created_at=db_qa.created_at.isoformat() + "Z",
+            card_type=db_qa.card_type or "qa"
+        )
+    
+    # Source Note operations
+    def create_source_note(self, cluster_id: int, source_metadata: SourceMetadata, source_content: SourceContent) -> SourceNoteDB:
+        """Create a new source note"""
+        source_note = SourceNoteDB(
+            source_metadata=source_metadata.dict(),
+            source_content=source_content.dict(),
+            cluster_id=cluster_id
+        )
+        self.session.add(source_note)
+        self.session.commit()
+        self.session.refresh(source_note)
+        return source_note
+    
+    def get_source_note_by_id(self, source_note_id: str) -> Optional[SourceNoteDB]:
+        """Get source note by ID"""
+        statement = select(SourceNoteDB).where(SourceNoteDB.source_note_id == source_note_id)
+        return self.session.exec(statement).first()
+    
+    def update_source_note(self, source_note: SourceNoteDB, source_metadata: Optional[SourceMetadata] = None, source_content: Optional[SourceContent] = None) -> SourceNoteDB:
+        """Update a source note"""
+        if source_metadata is not None:
+            source_note.source_metadata = source_metadata.dict()
+        if source_content is not None:
+            source_note.source_content = source_content.dict()
+        
+        self.session.add(source_note)
+        self.session.commit()
+        self.session.refresh(source_note)
+        return source_note
+    
+    def delete_source_note(self, source_note: SourceNoteDB) -> None:
+        """Delete a source note"""
+        self.session.delete(source_note)
+        self.session.commit()
+    
+    def convert_to_api_source_note(self, db_source_note: SourceNoteDB) -> SourceNote:
+        """Convert database source note to API model"""
+        source_metadata = None
+        if db_source_note.source_metadata:
+            source_metadata = SourceMetadata(**db_source_note.source_metadata)
+        
+        source_content = None
+        if db_source_note.source_content:
+            source_content = SourceContent(**db_source_note.source_content)
+        
+        return SourceNote(
+            _id=db_source_note.source_note_id,
+            source_note_id=db_source_note.source_note_id,
+            source_metadata=source_metadata,
+            source_content=source_content,
+            created_at=db_source_note.created_at.isoformat() + "Z"
         )
