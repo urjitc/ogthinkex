@@ -138,7 +138,6 @@ class AddSourceNoteResponse(BaseModel):
 class UpdateSourceNoteRequest(BaseModel):
     cluster_list_id: str
     cluster_name: str
-    source_note_id: str
     source_metadata: Optional[SourceMetadata] = None
     source_content: Optional[SourceContent] = None
 
