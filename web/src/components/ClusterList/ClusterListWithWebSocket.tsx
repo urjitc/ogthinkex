@@ -647,40 +647,31 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
         {/* Kanban Board */}
         <div className="flex-1 flex flex-col min-h-0 pt-3 pb-2 bg-zinc-950/50 relative">
-          {isLoading || isFetching ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center space-x-2 text-gray-400">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                <span>Loading cluster list...</span>
-              </div>
+          <div
+            ref={scrollContainerRef}
+            className="h-full overflow-x-auto scrollbar-hide"
+            style={{ scrollPaddingLeft: '1.5rem' }}
+            onScroll={updateScrollbar}
+          >
+            <div className="flex gap-6 h-full px-6 pb-3">
+              {filteredClusters.map((cluster, index) => {
+                console.log('Rendering cluster:', cluster.title, 'with', cluster.qas.length, 'QAs');
+                return (
+                  <KanbanColumn 
+                    key={`${cluster.title}-${selectedListId}`} 
+                    cluster={cluster} 
+                    onOpenQAModal={openQAModal}
+                    onDeleteQA={handleDeleteQA}
+                    onDeleteCluster={handleDeleteCluster}
+                    isAnimated={animatedNodeId === cluster.title}
+                    columnIndex={index}
+                    animatedItems={animatedItems}
+                  />
+                );
+              })}
+              <div className="flex-shrink-0 w-px" />
             </div>
-          ) : (
-            <div
-              ref={scrollContainerRef}
-              className="h-full overflow-x-auto scrollbar-hide"
-              style={{ scrollPaddingLeft: '1.5rem' }}
-              onScroll={updateScrollbar}
-            >
-              <div className="flex gap-6 h-full px-6 pb-3">
-                {filteredClusters.map((cluster, index) => {
-                  console.log('Rendering cluster:', cluster.title, 'with', cluster.qas.length, 'QAs');
-                  return (
-                    <KanbanColumn 
-                      key={`${cluster.title}-${selectedListId}`} 
-                      cluster={cluster} 
-                      onOpenQAModal={openQAModal}
-                      onDeleteQA={handleDeleteQA}
-                      onDeleteCluster={handleDeleteCluster}
-                      isAnimated={animatedNodeId === cluster.title}
-                      columnIndex={index}
-                      animatedItems={animatedItems}
-                    />
-                  );
-                })}
-                <div className="flex-shrink-0 w-px" />
-              </div>
-            </div>
-          )}
+          </div>
           
           {/* Custom Always-Visible Scrollbar */}
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-800 rounded-full">
