@@ -6,7 +6,12 @@ import BreadcrumbBar from './BreadcrumbBar';
 import KanbanColumn from './KanbanColumn';
 import MainPanel from './MainPanel';
 import QAModal from './QAModal';
+import ResearchModal from './ResearchModal';
+import FlashcardModal from './FlashcardModal';
 import QACard from './QACard';
+import ResearchCard from './ResearchCard';
+import SourceNoteCard from './SourceNoteCard';
+import FlashcardCard from './FlashcardCard';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import type { TreeNode, BreadcrumbItem } from './types';
 import { useAllClusterLists } from '../../hooks/useAllClusterLists';
@@ -22,6 +27,35 @@ export interface QAPair {
   question: string;
   answer: string;
   created_at: string;
+  card_type?: 'research' | 'qa' | 'source_note' | 'flashcard'; // New field to distinguish card types
+  related_qas?: QAPair[]; // For research cards: multiple related Q&As
+  // Source note specific fields
+  source_metadata?: {
+    title: string;
+    url?: string;
+    author?: string;
+    publication_date?: string;
+    source_type: 'book' | 'article' | 'pdf' | 'video' | 'website' | 'other';
+  };
+  source_content?: {
+    summary: string;
+    key_takeaways: string[];
+    personal_notes: string;
+    tags: string[];
+  };
+  // Flashcard specific fields
+  flashcard_set?: {
+    title: string;
+    description: string;
+    cards: Array<{
+      id: string;
+      front: string;
+      back: string;
+      difficulty?: 'easy' | 'medium' | 'hard';
+    }>;
+    tags: string[];
+    created_by?: string;
+  };
 }
 
 export interface Cluster {
@@ -75,8 +109,12 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
   const animationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-    const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'qa' | 'cluster' } | null>(null);
+  const [researchModalOpen, setResearchModalOpen] = useState<boolean>(false);
+  const [flashcardModalOpen, setFlashcardModalOpen] = useState<boolean>(false);
+  const [selectedQAItem, setSelectedQAItem] = useState<QAPair | null>(null);
+  const [selectedResearchItem, setSelectedResearchItem] = useState<QAPair | null>(null);
+  const [selectedFlashcardItem, setSelectedFlashcardItem] = useState<QAPair | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'qa' | 'cluster' | 'clusterList' } | null>(null);
   const [activeDragData, setActiveDragData] = useState<{ item: QAPair; clusterTitle: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -92,29 +130,18 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     queryFn: () => fetchClusterList(selectedListId),
     enabled: !!selectedListId, // Only run if a list is selected
     placeholderData: keepPreviousData,
-    onSuccess: (data) => {
-      console.groupCollapsed('[DEBUG] Cluster data loaded');
-      console.log('Selected list ID:', selectedListId);
-      console.log('Received data:', data);
-      console.log('First QA ID:', data?.clusters?.[0]?.qas?.[0]?._id);
-      console.groupEnd();
-    }
   });
 
   useEffect(() => {
     if (clusterData) {
-      console.log('Cluster Data:', {
-        id: clusterData.id,
-        title: clusterData.title,
-        clusterCount: clusterData.clusters?.length,
-        qaCount: clusterData.clusters?.reduce((acc, c) => acc + c.qas.length, 0),
-        firstCluster: clusterData.clusters?.[0],
-        firstQA: clusterData.clusters?.[0]?.qas?.[0]
-      });
-    } else {
-      console.log('No cluster data available');
+      console.groupCollapsed('[DEBUG] Cluster data loaded');
+      console.log('Selected list ID:', selectedListId);
+      console.log('Received data:', clusterData);
+      console.log('First QA ID:', clusterData?.clusters?.[0]?.qas?.[0]?._id);
+      console.groupEnd();
     }
-  }, [clusterData]);
+  }, [clusterData, selectedListId]);
+
 
   // Use the new drag reorder hook
   const { reorder, dragItems } = useDragReorder(clusterData || null, selectedListId);
@@ -152,6 +179,45 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     },
   });
 
+  const deleteClusterListMutation = useMutation({
+    mutationFn: async (listId: string) => {
+      const url = `${PUBLIC_API_BASE_URL}/cluster-lists/${listId}`;
+      console.log(`[DEBUG] Attempting to delete cluster list at URL: ${url}`);
+      console.log(`[DEBUG] List ID: ${listId}`);
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+      });
+      
+      console.log(`[DEBUG] Response status: ${response.status}`);
+      console.log(`[DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[DEBUG] Delete failed with status ${response.status}: ${errorText}`);
+        throw new Error(`Failed to delete cluster list: ${response.status} ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log(`[DEBUG] Delete successful:`, result);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allClusterLists'] });
+      // If we deleted the currently selected list, select the first available list
+      if (allClusterLists && allClusterLists.length > 1) {
+        const remainingLists = allClusterLists.filter(list => list.id !== itemToDelete?.id);
+        if (remainingLists.length > 0) {
+          setSelectedListId(remainingLists[0].id);
+        } else {
+          setSelectedListId(null);
+        }
+      } else {
+        setSelectedListId(null);
+      }
+    },
+  });
+
 
 
   const handleDeleteQA = (qaId: string, clusterName: string) => {
@@ -162,6 +228,10 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     setItemToDelete({ id: clusterName, name: clusterName, type: 'cluster' });
   };
 
+  const handleDeleteClusterList = (listId: string, listName: string) => {
+    setItemToDelete({ id: listId, name: listName, type: 'clusterList' });
+  };
+
   const confirmDelete = () => {
     if (!itemToDelete) return;
 
@@ -169,6 +239,8 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
       deleteQAMutation.mutate({ qaId: itemToDelete.id, clusterName: itemToDelete.name });
     } else if (itemToDelete.type === 'cluster') {
       deleteClusterMutation.mutate(itemToDelete.id);
+    } else if (itemToDelete.type === 'clusterList') {
+      deleteClusterListMutation.mutate(itemToDelete.id);
     }
 
     setItemToDelete(null);
@@ -210,13 +282,24 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
       name: list.title,
       type: 'topic' as const,
       children: (list.id === selectedListId && clusterData)
-        ? clusterData.clusters.map(cluster => ({
-            id: cluster.title, // Keep using title for cluster ID within the sidebar
-            name: cluster.title,
-            type: 'subtopic' as const,
-            children: [],
-            nodeIds: [], // This can be populated if needed later
-          }))
+        ? [
+            // Always include Research cluster first
+            {
+              id: 'Research',
+              name: 'Research',
+              type: 'subtopic' as const,
+              children: [],
+              nodeIds: [],
+            },
+            // Then include other clusters
+            ...clusterData.clusters.map(cluster => ({
+              id: cluster.title, // Keep using title for cluster ID within the sidebar
+              name: cluster.title,
+              type: 'subtopic' as const,
+              children: [],
+              nodeIds: [], // This can be populated if needed later
+            }))
+          ]
         : [],
       nodeIds: [],
     }));
@@ -244,9 +327,10 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
     if (!displayData) return [];
     console.log('Filtered clusters data:', displayData.clusters);
     const q = searchQuery.trim().toLowerCase();
+    
     if (!q) return displayData.clusters;
 
-        return displayData.clusters
+    return displayData.clusters
       .map(cluster => {
         const filteredQas = cluster.qas.filter(
           qa =>
@@ -399,13 +483,31 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
 
   const openQAModal = (qaItem: QAPair) => {
-    setSelectedQAItem(qaItem);
-    setModalOpen(true);
+    if (qaItem.card_type === 'research') {
+      setSelectedResearchItem(qaItem);
+      setResearchModalOpen(true);
+    } else if (qaItem.card_type === 'flashcard') {
+      setSelectedFlashcardItem(qaItem);
+      setFlashcardModalOpen(true);
+    } else {
+      setSelectedQAItem(qaItem);
+      setModalOpen(true);
+    }
   };
 
   const closeQAModal = () => {
     setModalOpen(false);
     setSelectedQAItem(null);
+  };
+
+  const closeResearchModal = () => {
+    setResearchModalOpen(false);
+    setSelectedResearchItem(null);
+  };
+
+  const closeFlashcardModal = () => {
+    setFlashcardModalOpen(false);
+    setSelectedFlashcardItem(null);
   };
 
 
@@ -512,6 +614,7 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         onSelectList={setSelectedListId}
         onSearchChange={setSearchQuery}
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onDeleteList={handleDeleteClusterList}
       />
 
       {/* Main Content */}
@@ -561,10 +664,24 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
 
 
       {/* QA Modal */}
-            <QAModal
+      <QAModal
         isOpen={modalOpen}
         qaItem={selectedQAItem}
         onClose={closeQAModal}
+      />
+
+      {/* Research Modal */}
+      <ResearchModal
+        isOpen={researchModalOpen}
+        researchItem={selectedResearchItem}
+        onClose={closeResearchModal}
+      />
+
+      {/* Flashcard Modal */}
+      <FlashcardModal
+        isOpen={flashcardModalOpen}
+        flashcardItem={selectedFlashcardItem}
+        onClose={closeFlashcardModal}
       />
 
       <DragOverlay
@@ -574,13 +691,39 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         }}
       >
         {activeDragData ? (
-          <QACard
-            item={activeDragData.item}
-            clusterTitle={activeDragData.clusterTitle}
-            isOverlay={true}
-            onOpenModal={() => {}}
-            onDelete={() => {}}
-          />
+          activeDragData.item.card_type === 'research' ? (
+            <ResearchCard
+              item={activeDragData.item}
+              clusterTitle={activeDragData.clusterTitle}
+              isOverlay={true}
+              onOpenModal={() => {}}
+              onDelete={() => {}}
+            />
+          ) : activeDragData.item.card_type === 'source_note' ? (
+            <SourceNoteCard
+              item={activeDragData.item}
+              clusterTitle={activeDragData.clusterTitle}
+              isOverlay={true}
+              onOpenModal={() => {}}
+              onDelete={() => {}}
+            />
+          ) : activeDragData.item.card_type === 'flashcard' ? (
+            <FlashcardCard
+              item={activeDragData.item}
+              clusterTitle={activeDragData.clusterTitle}
+              isOverlay={true}
+              onOpenModal={() => {}}
+              onDelete={() => {}}
+            />
+          ) : (
+            <QACard
+              item={activeDragData.item}
+              clusterTitle={activeDragData.clusterTitle}
+              isOverlay={true}
+              onOpenModal={() => {}}
+              onDelete={() => {}}
+            />
+          )
         ) : null}
       </DragOverlay>
 
@@ -588,8 +731,8 @@ const ClusterListWithWebSocket: React.FC<{ listId?: string }> = ({ listId: initi
         isOpen={!!itemToDelete}
         onClose={() => setItemToDelete(null)}
         onConfirm={confirmDelete}
-        title={`Delete ${itemToDelete?.type === 'qa' ? 'Q/A Item' : 'Cluster'}`}
-        message={`Are you sure you want to delete this ${itemToDelete?.type === 'qa' ? 'item' : `cluster and all its content`}? This action cannot be undone.`}
+        title={`Delete ${itemToDelete?.type === 'qa' ? 'Q/A Item' : itemToDelete?.type === 'cluster' ? 'Cluster' : 'Cluster List'}`}
+        message={`Are you sure you want to delete this ${itemToDelete?.type === 'qa' ? 'item' : itemToDelete?.type === 'cluster' ? 'cluster and all its content' : 'cluster list and all its content'}? This action cannot be undone.`}
       />
     </div>
     </DndContext>

@@ -22,7 +22,7 @@ const ClusterListWrapper: React.FC<ClusterListWrapperProps> = ({ graphId }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-        <ClusterListWithWebSocket graphId={graphId} />
+        <ClusterListWithWebSocket listId={graphId} />
       </WebSocketProvider>
     </QueryClientProvider>
   );

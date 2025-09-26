@@ -6,7 +6,7 @@ from models import (
     ClusterList, ClusterListInfo, CreateClusterListRequest,
     AddQARequest, AddQAResponse, UpdateQARequest, UpdateQAResponse,
     MoveQARequest, MoveQAResponse, ReorderQAsRequest,
-    DeleteQAResponse, DeleteClusterResponse
+    DeleteQAResponse, DeleteClusterResponse, DeleteClusterListResponse
 )
 from services.ably_manager import AblyManager
 from fastapi import Query
@@ -88,6 +88,48 @@ def get_cluster_list_by_id(
     if not db_cluster_list:
         raise HTTPException(status_code=404, detail=f"ClusterList with id '{cluster_list_id}' not found.")
     return db_service.convert_to_api_cluster_list(db_cluster_list)
+
+
+@router.delete("/cluster-lists/{cluster_list_id}", response_model=DeleteClusterListResponse, operation_id="delete_cluster_list")
+async def delete_cluster_list(
+    cluster_list_id: str,
+    db_service: DatabaseService = Depends(get_database_service),
+    manager: AblyManager = Depends(get_ably_manager)
+):
+    """Delete an entire cluster list and all its clusters and QAs"""
+    print(f"[DEBUG] DELETE cluster list endpoint called with ID: {cluster_list_id}")
+    
+    # Get the cluster list
+    db_cluster_list = db_service.get_cluster_list_by_id(cluster_list_id)
+    if not db_cluster_list:
+        print(f"[DEBUG] Cluster list not found with ID: {cluster_list_id}")
+        raise HTTPException(status_code=404, detail=f"Cluster list with id '{cluster_list_id}' not found.")
+    
+    cluster_list_title = db_cluster_list.title
+    print(f"[DEBUG] Found cluster list: {cluster_list_title}")
+    
+    # Delete the cluster list (this will cascade delete all clusters and QAs)
+    db_service.delete_cluster_list(db_cluster_list)
+    print(f"[DEBUG] Deleted cluster list from database")
+    
+    # Broadcast the update
+    if manager and manager.is_ready():
+        print(f"[DEBUG] Broadcasting cluster list deletion update")
+        await manager.broadcast({
+            "type": "cluster_list_update",
+            "payload": {
+                "list_id": cluster_list_id
+            }
+        })
+    else:
+        print(f"[DEBUG] Manager not ready, skipping broadcast")
+    
+    print(f"[DEBUG] Returning success response for cluster list deletion")
+    return DeleteClusterListResponse(
+        message=f"Deleted cluster list '{cluster_list_title}' and all its content.",
+        clusterListId=cluster_list_id,
+        clusterListTitle=cluster_list_title
+    )
 
 
 @router.patch(
@@ -508,3 +550,5 @@ async def delete_qa_from_cluster(
         qa_id=qa_id,
         clusterName=cluster_name
     )
+
+
