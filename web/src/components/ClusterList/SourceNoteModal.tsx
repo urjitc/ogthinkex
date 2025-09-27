@@ -190,80 +190,83 @@ const SourceNoteModal: React.FC<SourceNoteModalProps> = ({ isOpen, sourceNoteIte
               </div>
             </div>
 
-            {/* Summary Section */}
-            {sourceContent?.summary && (
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-blue-400 mb-3">
-                  Summary
-                </h3>
-                <div className="p-4 bg-zinc-800/30 rounded-lg">
-                  <div className="text-gray-200">
-                    <MarkdownText content={sourceContent.summary} />
+            {/* Scrollable content area */}
+            <div className="flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              {/* Summary Section */}
+              {sourceContent?.summary && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-blue-400 mb-3">
+                    Summary
+                  </h3>
+                  <div className="p-4 bg-zinc-800/30 rounded-lg">
+                    <div className="text-gray-200">
+                      <MarkdownText content={sourceContent.summary} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Key Takeaways */}
-            {sourceContent?.key_takeaways && sourceContent.key_takeaways.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-yellow-400 mb-3">
-                  Key Takeaways
-                </h3>
-                <div className="p-4 bg-zinc-800/30 rounded-lg">
-                  <ul className="space-y-2">
-                    {sourceContent.key_takeaways.map((takeaway: string, index: number) => (
-                      <li key={index} className="text-gray-200 flex items-start">
-                        <span className="text-yellow-400 mr-2">•</span>
-                        <MarkdownText content={takeaway} />
-                      </li>
+              {/* Key Takeaways */}
+              {sourceContent?.key_takeaways && sourceContent.key_takeaways.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-yellow-400 mb-3">
+                    Key Takeaways
+                  </h3>
+                  <div className="p-4 bg-zinc-800/30 rounded-lg">
+                    <ul className="space-y-2">
+                      {sourceContent.key_takeaways.map((takeaway: string, index: number) => (
+                        <li key={index} className="text-gray-200 flex items-start">
+                          <span className="text-yellow-400 mr-2">•</span>
+                          <MarkdownText content={takeaway} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Personal Notes */}
+              {sourceContent?.personal_notes && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-purple-400 mb-3">
+                    Personal Notes
+                  </h3>
+                  <div className="p-4 bg-zinc-800/30 rounded-lg">
+                    <div className="text-gray-200">
+                      <MarkdownText content={sourceContent.personal_notes} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tags */}
+              {sourceContent?.tags && sourceContent.tags.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-gray-400 mb-3">
+                    Tags
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {sourceContent.tags.map((tag: string, index: number) => (
+                      <span 
+                        key={index}
+                        className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-sm"
+                      >
+                        {tag}
+                      </span>
                     ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Personal Notes */}
-            {sourceContent?.personal_notes && (
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-purple-400 mb-3">
-                  Personal Notes
-                </h3>
-                <div className="p-4 bg-zinc-800/30 rounded-lg">
-                  <div className="text-gray-200">
-                    <MarkdownText content={sourceContent.personal_notes} />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Tags */}
-            {sourceContent?.tags && sourceContent.tags.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-400 mb-3">
-                  Tags
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {sourceContent.tags.map((tag: string, index: number) => (
-                    <span 
-                      key={index}
-                      className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-sm"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+              {/* Created date if available */}
+              {sourceNoteItem.created_at && (
+                <div className="mt-6 pt-4 border-t border-zinc-800">
+                  <p className="text-sm text-gray-400">
+                    Created: {new Date(sourceNoteItem.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-              </div>
-            )}
-
-            {/* Created date if available */}
-            {sourceNoteItem.created_at && (
-              <div className="mt-6 pt-4 border-t border-zinc-800">
-                <p className="text-sm text-gray-400">
-                  Created: {new Date(sourceNoteItem.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
